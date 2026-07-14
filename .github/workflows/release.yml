@@ -1,0 +1,35 @@
+# Publish to npm on a version tag (v1.2.3). Publishing to npm is all a CDN
+# needs: unpkg and jsDelivr mirror the registry automatically.
+#
+# Auth is npm TRUSTED PUBLISHING (OIDC): no tokens, and provenance
+# attestations are generated automatically.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  id-token: write # OIDC for trusted publishing + provenance
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+      - run: npm install -g npm@latest # trusted publishing needs npm >= 11.5.1
+      - run: npm ci
+      - name: Tag must match package.json version
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME does not match package.json $version" >&2
+            exit 1
+          fi
+      # prepublishOnly runs typecheck + tests + build.
+      - run: npm publish
