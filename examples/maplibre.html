@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>veritiles + MapLibre GL</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+    <script src="https://unpkg.com/pmtiles@4.4.1/dist/pmtiles.js"></script>
+    <!-- After `npm run build`; published apps use the CDN instead:
+         https://unpkg.com/veritiles@0.1.0/dist/veritiles.js -->
+    <script src="../dist/veritiles.js"></script>
+    <style>
+        body { margin: 0; }
+        #map { position: absolute; inset: 0; }
+        #badge {
+            position: absolute; top: 10px; right: 10px; z-index: 1;
+            background: rgba(255, 255, 255, 0.9); border-radius: 4px;
+            padding: 6px 10px; font: 13px/1.4 monospace;
+        }
+        #badge .rejected { color: #c0392b; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="badge">loading…</div>
+    <script>
+        // The root CID is the only trust anchor; the base URL below is an
+        // untrusted directory serving the package files and could be swapped
+        // for any mirror or IPFS gateway path holding the same content.
+        const rootCid = 'bafybeidromswvzgmm4hwagh6yn3ktbf2wajgfmt3zcqkt4oofmqw4wfkja';
+        const source = new veritiles.VerifiedSource({
+            rootCid,
+            source: `https://guillaumemichel.github.io/ipfs-pmtiles-demo/ipfs/${rootCid}`,
+        });
+
+        const protocol = new pmtiles.Protocol();
+        maplibregl.addProtocol('pmtiles', protocol.tile);
+        protocol.add(new pmtiles.PMTiles(source)); // before the style loads
+
+        const map = new maplibregl.Map({
+            container: 'map',
+            center: [0, 20],
+            zoom: 2,
+            style: {
+                version: 8,
+                sources: {
+                    verified: {
+                        type: 'vector',
+                        url: 'pmtiles://' + rootCid,
+                        attribution: '<a href="https://github.com/protomaps/basemaps">Protomaps</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                    },
+                },
+                layers: [
+                    { id: 'background', type: 'background', paint: { 'background-color': '#f0f8ff' } },
+                    { id: 'land', type: 'fill', source: 'verified', 'source-layer': 'land',
+                      paint: { 'fill-color': '#f8f4f0' } },
+                    { id: 'water', type: 'fill', source: 'verified', 'source-layer': 'water',
+                      paint: { 'fill-color': '#a0c8f0' } },
+                ],
+            },
+        });
+
+        const badge = document.getElementById('badge');
+        setInterval(() => {
+            const { verified, rejected } = source.stats;
+            badge.innerHTML = `✓ ${verified} hashes verified` +
+                (rejected ? ` / <span class="rejected">✗ ${rejected} tampered</span>` : '');
+        }, 500);
+    </script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>veritiles + OpenLayers (ol-pmtiles)</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link rel="stylesheet" href="https://unpkg.com/ol@10.6.1/ol.css">
+    <script src="https://unpkg.com/ol@10.6.1/dist/ol.js"></script>
+    <script src="https://unpkg.com/ol-pmtiles@2.0.2/dist/olpmtiles.js"></script>
+    <!-- After `npm run build`; published apps use the CDN instead:
+         https://unpkg.com/veritiles@0.1.0/dist/veritiles.js -->
+    <script src="../dist/veritiles.js"></script>
+    <style>
+        body { margin: 0; }
+        #map { position: absolute; inset: 0; background: #f0f8ff; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        const rootCid = 'bafybeidromswvzgmm4hwagh6yn3ktbf2wajgfmt3zcqkt4oofmqw4wfkja';
+        // ol-pmtiles accepts a raw pmtiles `Source` as its url option — the
+        // verified source needs no wrapper at all here.
+        const source = new olpmtiles.PMTilesVectorSource({
+            url: new veritiles.VerifiedSource({
+                rootCid,
+                source: `https://guillaumemichel.github.io/ipfs-pmtiles-demo/ipfs/${rootCid}`,
+            }),
+            attributions: ['<a href="https://github.com/protomaps/basemaps">Protomaps</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'],
+        });
+
+        const palette = {
+            land: new ol.style.Style({ fill: new ol.style.Fill({ color: '#f8f4f0' }) }),
+            water: new ol.style.Style({ fill: new ol.style.Fill({ color: '#a0c8f0' }) }),
+        };
+        const map = new ol.Map({
+            target: 'map',
+            layers: [
+                new ol.layer.VectorTile({
+                    declutter: true,
+                    source,
+                    style: (feature) => palette[feature.get('layer')],
+                }),
+            ],
+            view: new ol.View({ center: [0, 2000000], zoom: 2 }),
+        });
+    </script>
+</body>
+</html>

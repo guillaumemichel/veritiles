@@ -1,0 +1,65 @@
+{
+  "name": "veritiles",
+  "version": "0.1.0",
+  "description": "Verified map tiles: a pmtiles-compatible Source that fetches PMTiles byte ranges from any dumb HTTP host and cryptographically verifies every byte against a content-addressed trust anchor (CID) before your map renders it.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Guillaume Michel",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guillaumemichel/veritiles.git"
+  },
+  "homepage": "https://github.com/guillaumemichel/veritiles#readme",
+  "bugs": {
+    "url": "https://github.com/guillaumemichel/veritiles/issues"
+  },
+  "keywords": [
+    "pmtiles",
+    "maplibre",
+    "leaflet",
+    "openlayers",
+    "ipfs",
+    "cid",
+    "verification",
+    "integrity",
+    "maps",
+    "tiles",
+    "vector-tiles"
+  ],
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "unpkg": "./dist/veritiles.js",
+  "jsdelivr": "./dist/veritiles.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test 'test/*.test.ts'",
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "npm run build:types && npm run build:esm && npm run build:iife",
+    "build:types": "tsc -p tsconfig.build.json",
+    "build:esm": "esbuild src/index.ts --bundle --format=esm --target=es2022 --outfile=dist/index.js",
+    "build:iife": "esbuild src/index.ts --bundle --format=iife --global-name=veritiles --minify --target=es2022 --outfile=dist/veritiles.js",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@ipld/dag-pb": "^4.1.7",
+    "@types/node": "^26.1.1",
+    "esbuild": "^0.28.1",
+    "multiformats": "^14.0.4",
+    "pmtiles": "^4.4.1",
+    "typescript": "^7.0.2"
+  }
+}

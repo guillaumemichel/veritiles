@@ -1,0 +1,34 @@
+{
+  "formatVersion": 2,
+  "source": {
+    "build": "protomaps 20250902",
+    "maxZoom": 6
+  },
+  "attribution": "<a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\">&copy; OpenStreetMap</a>",
+  "chunking": {
+    "strategy": "tile-aligned",
+    "toolVersion": "ipfs-unixfs-importer@17.0.1"
+  },
+  "hash": "sha2-256",
+  "map": {
+    "file": "map.pmtiles",
+    "size": 44199060
+  },
+  "proofs": {
+    "dir": "proofs",
+    "metaDigest": "b0776b07b122eb11d916c51afa57fffee3142a6bd5de11551a57ee34081da1f4",
+    "shardCapBytes": 65536
+  },
+  "children": [
+    {
+      "name": "map.pmtiles",
+      "cid": "bafybeigulyyqowdlgyepgnw3ido3ewz7skb5dghs3atcnzvinsjnbtvfvm",
+      "tsize": 44340258
+    },
+    {
+      "name": "proofs",
+      "cid": "bafybeigs5fr42jxjcjbwiymkypta3gwbfq75pxyp4sinzas6zwzbi3mp3e",
+      "tsize": 104838
+    }
+  ]
+}

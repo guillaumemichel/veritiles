@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>veritiles + Leaflet (protomaps-leaflet)</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/pmtiles@4.4.1/dist/pmtiles.js"></script>
+    <script src="https://unpkg.com/protomaps-leaflet@5.1.0/dist/protomaps-leaflet.js"></script>
+    <!-- After `npm run build`; published apps use the CDN instead:
+         https://unpkg.com/veritiles@0.1.0/dist/veritiles.js -->
+    <script src="../dist/veritiles.js"></script>
+    <style>
+        body { margin: 0; }
+        #map { position: absolute; inset: 0; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        const rootCid = 'bafybeidromswvzgmm4hwagh6yn3ktbf2wajgfmt3zcqkt4oofmqw4wfkja';
+        const source = new veritiles.VerifiedSource({
+            rootCid,
+            source: `https://guillaumemichel.github.io/ipfs-pmtiles-demo/ipfs/${rootCid}`,
+        });
+
+        const map = L.map('map').setView([20, 0], 2);
+        // protomaps-leaflet's `url` option accepts a PMTiles instance, so the
+        // verified source drops straight in.
+        protomapsL.leafletLayer({
+            url: new pmtiles.PMTiles(source),
+            flavor: 'light',
+            lang: 'en',
+            attribution: '<a href="https://github.com/protomaps/basemaps">Protomaps</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        }).addTo(map);
+    </script>
+</body>
+</html>
