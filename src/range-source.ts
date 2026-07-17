@@ -54,8 +54,11 @@ export class RangeSource {
     return readBody(res, length);
   }
 
+  // A file artifact's bytes live at `{base}` itself (A3); a member lives at
+  // `{base}/{path}`. The empty path must not append a trailing slash. The map
+  // path never fetches '', so it is unaffected.
   #url(path: string): string {
-    return `${this.#base}/${encodePath(path)}`;
+    return path === '' ? this.#base : `${this.#base}/${encodePath(path)}`;
   }
 
   async #request(url: string, init: RequestInit, plainGet: boolean): Promise<Response> {

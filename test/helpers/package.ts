@@ -68,7 +68,7 @@ export async function buildMapPackage({
     })),
   ];
   const manifest = {
-    formatVersion: 2,
+    formatVersion: 1,
     hash: 'sha2-256',
     map: { file: 'map.pmtiles', size: mapBytes.length },
     proofs: { dir: 'proofs', metaDigest: sha256Hex(tree.topMeta), shardCapBytes: shardCap },

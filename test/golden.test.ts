@@ -16,7 +16,7 @@ import { VerifiedSource } from '../src/index.ts';
 import { VerifiedStore } from '../src/verified-store.ts';
 import { rangeFetch } from './helpers/host.ts';
 
-const GOLDEN_ROOT = 'bafybeidromswvzgmm4hwagh6yn3ktbf2wajgfmt3zcqkt4oofmqw4wfkja';
+const GOLDEN_ROOT = 'bafybeihnila5l5dabqrbpvaictnce5wop364y5kbc7kfowbnd5mbnpayci';
 const MAP_SIZE = 44199060;
 const LEAF_COUNT = 2905;
 const HEAD_LENGTH = 65536;

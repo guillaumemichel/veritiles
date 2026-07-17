@@ -9,7 +9,7 @@
     <script src="https://unpkg.com/pmtiles@4.4.1/dist/pmtiles.js"></script>
     <!-- For local development against this checkout, run `npm run build`
          and swap in ../dist/veritiles.js -->
-    <script src="https://unpkg.com/veritiles@0.1.0/dist/veritiles.js"></script>
+    <script src="https://unpkg.com/veritiles@0.2.0/dist/veritiles.js"></script>
     <style>
         body { margin: 0; }
         #map { position: absolute; inset: 0; }
@@ -28,7 +28,7 @@
         // The root CID is the only trust anchor; the base URL below is an
         // untrusted directory serving the package files and could be swapped
         // for any mirror or IPFS gateway path holding the same content.
-        const rootCid = 'bafybeidromswvzgmm4hwagh6yn3ktbf2wajgfmt3zcqkt4oofmqw4wfkja';
+        const rootCid = 'bafybeihnila5l5dabqrbpvaictnce5wop364y5kbc7kfowbnd5mbnpayci';
         const source = new veritiles.VerifiedSource({
             rootCid,
             source: `https://guillaumemichel.github.io/ipfs-pmtiles-demo/ipfs/${rootCid}`,

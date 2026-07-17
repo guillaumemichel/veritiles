@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import type { ByteSource } from '../src/verified-store.ts';
 import { VerifiedStore } from '../src/verified-store.ts';
+import { equalBytes, verifyDigest, VerificationError } from '../src/verify.ts';
 import { deterministicBytes, flipByte, sha256Hex } from './helpers/bytes.ts';
 
 function chunk(length: number, seed: number, offset = 0) {
@@ -283,4 +284,142 @@ test('a consumer joining after the last aborted gets a fresh fetch', async () =>
   await assert.rejects(first);
   assert.deepEqual(await store.fetchWhole('x', c.digest, 4096), c.bytes);
   assert.equal(calls, 2);
+});
+
+// --- A4: fetchChecked + tamper bans (A8) ---
+
+const okCheck = (want: Uint8Array) => async (bytes: Uint8Array) => {
+  if (!equalBytes(bytes, want)) throw new VerificationError('bytes do not match');
+};
+
+test('S-01 fetchChecked caches under cacheKey and de-duplicates concurrent callers', async () => {
+  const bytes = deterministicBytes(100, 30);
+  let requests = 0;
+  const store = new VerifiedStore([source({ files: new Map([['x', bytes]]) }, { onRequest: () => requests++ })]);
+  const [a, b] = await Promise.all([
+    store.fetchChecked('x', 'key', 4096, okCheck(bytes)),
+    store.fetchChecked('x', 'key', 4096, okCheck(bytes)),
+  ]);
+  assert.deepEqual(a, bytes);
+  assert.deepEqual(b, bytes);
+  assert.equal(requests, 1);
+  assert.deepEqual(store.getCached('key'), bytes);
+});
+
+test('S-02 a verification failure bans the source for the rest of the session', async () => {
+  const files = new Map([['x', deterministicBytes(100, 31)], ['y', deterministicBytes(80, 32)]]);
+  const good = files.get('x')!;
+  const log: string[] = [];
+  const s1 = source({ files }, { onRequest: (w) => log.push(`s1:${w}`), tamper: (b) => flipByte(b) });
+  const s2 = source({ files }, { onRequest: (w) => log.push(`s2:${w}`) });
+  const store = new VerifiedStore([s1, s2]);
+
+  assert.deepEqual(await store.fetchChecked('x', 'kx', 4096, okCheck(good)), good);
+  assert.equal(store.stats.rejected, 1);
+  assert.equal(store.stats.verified, 1);
+
+  log.length = 0;
+  await store.fetchChecked('y', 'ky', 4096, okCheck(files.get('y')!));
+  assert.ok(!log.some((l) => l.startsWith('s1:')), 'banned source 1 never requested again');
+});
+
+test('S-03 a transport failure never bans: the source is retried later', async () => {
+  const files = new Map([['x', deterministicBytes(100, 33)]]);
+  const good = files.get('x')!;
+  const log: string[] = [];
+  const s1 = source({ files }, { fail: true, onRequest: () => log.push('s1') });
+  const s2 = source({ files }, { onRequest: () => log.push('s2') });
+  const store = new VerifiedStore([s1, s2]);
+  await store.fetchChecked('x', 'k1', 4096, okCheck(good));
+  await store.fetchChecked('x', 'k2', 4096, okCheck(good));
+  assert.equal(log.filter((l) => l === 's1').length, 2, 'source 1 tried on both reads');
+  assert.equal(store.stats.rejected, 0);
+});
+
+test('S-04 fetchWhole (digest wrapper) inherits bans', async () => {
+  const files = new Map([['x', deterministicBytes(100, 34)], ['y', deterministicBytes(60, 35)]]);
+  const log: string[] = [];
+  const s1 = source({ files }, { onRequest: (w) => log.push(`s1:${w}`), tamper: (b) => flipByte(b) });
+  const s2 = source({ files }, { onRequest: (w) => log.push(`s2:${w}`) });
+  const store = new VerifiedStore([s1, s2]);
+  await store.fetchWhole('x', sha256Hex(files.get('x')!), 4096);
+  log.length = 0;
+  await store.fetchWhole('y', sha256Hex(files.get('y')!), 4096);
+  assert.ok(!log.some((l) => l.startsWith('s1:')));
+});
+
+test('S-05 every source banned still throws, never hangs or empties to success', async () => {
+  const files = new Map([['x', deterministicBytes(100, 36)]]);
+  const good = files.get('x')!;
+  const store = new VerifiedStore([
+    source({ files }, { tamper: (b) => flipByte(b) }),
+    source({ files }, { tamper: (b) => flipByte(b, 1) }),
+  ]);
+  await assert.rejects(store.fetchChecked('x', 'k', 4096, okCheck(good)), AggregateError);
+  await assert.rejects(store.fetchChecked('x', 'k2', 4096, okCheck(good)), AggregateError);
+});
+
+test('S-06 a banned source is skipped by fetchUnverified and fetchRangeUnverified too', async () => {
+  const files = new Map([['x', deterministicBytes(100, 37)]]);
+  const good = files.get('x')!;
+  const buffer = deterministicBytes(200, 38);
+  const log: string[] = [];
+  const s1 = source({ files, buffer }, { onRequest: (w) => log.push(`s1:${w}`), tamper: (b) => flipByte(b) });
+  const s2 = source({ files, buffer }, { onRequest: (w) => log.push(`s2:${w}`) });
+  const store = new VerifiedStore([s1, s2]);
+  await store.fetchChecked('x', 'k', 4096, okCheck(good)); // bans s1
+  log.length = 0;
+  await store.fetchUnverified('x', 4096);
+  await store.fetchRangeUnverified('map', 0, 50);
+  assert.ok(!log.some((l) => l.startsWith('s1:')), 'banned source skipped in unverified reads');
+});
+
+test('S-07 check runs once per network response and never on a cache hit', async () => {
+  const bytes = deterministicBytes(100, 39);
+  let checks = 0;
+  const check = async (b: Uint8Array) => {
+    checks++;
+    if (!equalBytes(b, bytes)) throw new VerificationError('bad');
+  };
+  const store = new VerifiedStore([source({ files: new Map([['x', bytes]]) })]);
+  await store.fetchChecked('x', 'k', 4096, check);
+  await store.fetchChecked('x', 'k', 4096, check); // cache hit
+  assert.equal(checks, 1);
+});
+
+test('S-08 a non-VerificationError from check is transport: no ban, no rejected', async () => {
+  const files = new Map([['x', deterministicBytes(100, 40)], ['y', deterministicBytes(70, 41)]]);
+  const good = files.get('x')!;
+  const goodY = files.get('y')!;
+  const log: string[] = [];
+  const s1 = source({ files }, { onRequest: (w) => log.push(`s1:${w}`), tamper: (b) => flipByte(b) });
+  const s2 = source({ files }, { onRequest: (w) => log.push(`s2:${w}`) });
+  const store = new VerifiedStore([s1, s2]);
+  const plainCheck = (want: Uint8Array) => async (b: Uint8Array) => {
+    if (!equalBytes(b, want)) throw new Error('mismatch'); // plain Error, not VerificationError
+  };
+  await store.fetchChecked('x', 'kx', 4096, plainCheck(good));
+  assert.equal(store.stats.rejected, 0);
+  log.length = 0;
+  await store.fetchChecked('y', 'ky', 4096, plainCheck(goodY));
+  assert.ok(log.some((l) => l.startsWith('s1:')), 'source 1 not banned, tried again');
+});
+
+test('S-09 aborting mid-fetchChecked rejects and leaves the store usable', async () => {
+  const bytes = deterministicBytes(100, 42);
+  const hanging: ByteSource = {
+    fetchWhole: (_p, _c, { signal } = {}) =>
+      new Promise((_, reject) => signal!.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))),
+    fetchRange: async () => {
+      throw new Error('unused');
+    },
+  };
+  const store = new VerifiedStore([hanging]);
+  const controller = new AbortController();
+  const pending = store.fetchChecked('x', 'k', 4096, okCheck(bytes), { signal: controller.signal });
+  controller.abort();
+  await assert.rejects(pending);
+
+  const store2 = new VerifiedStore([source({ files: new Map([['x', bytes]]) })]);
+  assert.deepEqual(await store2.fetchChecked('x', 'k', 4096, okCheck(bytes)), bytes);
 });

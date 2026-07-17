@@ -1,5 +1,5 @@
 {
-  "formatVersion": 2,
+  "formatVersion": 1,
   "source": {
     "build": "protomaps 20250902",
     "maxZoom": 6

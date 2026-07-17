@@ -14,8 +14,8 @@ or `python -m http.server` — anything answering `GET` with single-`Range`
 verification, are counted, and are never rendered. With more than one
 source configured, a bad host is skipped for the next.
 
-- **Zero dependencies** — ~15 KB minified, including the CID and dag-pb
-  handling.
+- **Zero dependencies** — ~26 KB minified, including the CID, dag-pb,
+  UnixFS, and CARv1 handling.
 - **Zero per-tile overhead** — a warm tile read is one exact `Range`
   request, the same bytes an unverified client would fetch; proofs are
   ≈ 0.24 % of the archive, fetched lazily for browsed regions only.
@@ -42,7 +42,7 @@ npm install veritiles
 or from a CDN as a script tag (exposes the `veritiles` global):
 
 ```html
-<script src="https://unpkg.com/veritiles@0.1.0/dist/veritiles.js"></script>
+<script src="https://unpkg.com/veritiles@0.2.0/dist/veritiles.js"></script>
 ```
 
 ## Usage
@@ -52,9 +52,9 @@ or from a CDN as a script tag (exposes the `veritiles` global):
 ```html
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/pmtiles@4.4.1/dist/pmtiles.js"></script>
-<script src="https://unpkg.com/veritiles@0.1.0/dist/veritiles.js"></script>
+<script src="https://unpkg.com/veritiles@0.2.0/dist/veritiles.js"></script>
 <script>
-  const rootCid = 'bafybeidromswvzgmm4hwagh6yn3ktbf2wajgfmt3zcqkt4oofmqw4wfkja';
+  const rootCid = 'bafybeihnila5l5dabqrbpvaictnce5wop364y5kbc7kfowbnd5mbnpayci';
   const source = new veritiles.VerifiedSource({
     rootCid,
     source: `https://guillaumemichel.github.io/ipfs-pmtiles-demo/ipfs/${rootCid}`,
@@ -186,38 +186,122 @@ static hosts under an `/ipfs/<rootCid>/` path keep their URLs recognizable
 to IPFS tooling (e.g. IPFS Companion can redirect them to a local
 gateway), but that layout is a convention, not a requirement.
 
+## Verified assets
+
+Everything else a map needs — a **style**, a **sprite** set, **font
+glyphs**, any directory tree — is a *whole-file* resource rather than a
+range read. `VerifiedAsset` fetches these from dumb HTTP hosts and verifies
+them against a single **anchor CID**, exactly as `VerifiedSource` does for
+tiles. The anchor's codec says what it names (see
+[`SPEC.md`](./SPEC.md), Part 2):
+
+- **raw anchor** (`bafkrei…`) — a single file ≤ 256 KiB (a typical
+  `style.json`). The content is self-verifying; no proof exists.
+- **car anchor** (`bagbaiera…`) — a UnixFS file or directory of any size.
+  The anchor names a **proof file** (a strict CARv1 of the DAG's internal
+  nodes) whose verified root the client walks. Proof and content are
+  independently hostable.
+
+```js
+import { VerifiedAsset, assetProtocol } from 'veritiles';
+
+// A directory of glyphs; the proof defaults to `<base>.car`.
+const fonts = new VerifiedAsset({ cid: FONTS_ANCHOR, source: fontsBase });
+
+// A sprite whose proof is hosted somewhere else entirely.
+const sprite = new VerifiedAsset({
+  cid: SPRITE_ANCHOR,
+  source: spriteBase,                       // dumb mirror: content only
+  proof: 'https://cdn.example/sprite.car',  // proof hosted elsewhere
+});
+
+maplibregl.addProtocol('verified', assetProtocol([fonts, sprite]));
+
+// A raw style artifact — its own bytes are the trust input.
+const style = new VerifiedAsset({ cid: STYLE_ANCHOR, source: styleUrl });
+const map = new maplibregl.Map({
+  container: 'map',
+  style: JSON.parse(new TextDecoder().decode(await style.bytes(''))),
+});
+```
+
+with, inside the verified `style.json`:
+
+```json
+{
+  "glyphs": "verified://<fonts anchor>/{fontstack}/{range}.pbf",
+  "sprite": "verified://<sprite anchor>/sprite"
+}
+```
+
+A `verified://<anchor>/<path>` URL carries the **trust anchor, never the
+location**: the registry maps the anchor to a client instance whose URLs
+come from page configuration, so styles stay host-independent and are
+themselves pinnable artifacts.
+
+### `new VerifiedAsset(options)`
+
+| option          | type                 | required | description                                                                                        |
+| --------------- | -------------------- | -------- | -------------------------------------------------------------------------------------------------- |
+| `cid`           | `string`             | yes      | Anchor CID (CIDv1, base32, sha2-256): codec `raw` (the content) or `car` (a proof file).            |
+| `source`        | `string \| string[]` | yes      | Content base URL(s), tried in order.                                                                |
+| `proof`         | `string \| string[]` | no       | Proof URL(s), tried in order. Default `<base>.car` per content base. Only valid for a car anchor.    |
+| `fetchFn`       | `typeof fetch`       | no       | Replaces global `fetch` — instrumentation/test seam.                                                |
+| `maxCacheBytes` | `number`             | no       | Budget for the verified-byte LRU cache (default 64 MiB).                                             |
+| `maxFileBytes`  | `number`             | no       | Per-file bound for DAG files (default 64 MiB).                                                       |
+
+- `bytes(path?, { signal? })` → `Promise<Uint8Array>` — the file at `path`
+  (`''`, the default, is the artifact itself); a fresh copy each call.
+- `cid` → the anchor; `root` → the verified artifact root CID for
+  diagnostics; `stats` → `{ verified, rejected }`.
+- `NotFoundError` — an **authenticated absence**: the artifact provably does
+  not contain that path (distinct from a host's HTTP 404). The
+  `assetProtocol` adapter turns a `NotFound` glyph range into an empty
+  response (MapLibre tolerates sparse ranges); every other error surfaces.
+
+Asset hosts need only **HTTPS** and `Access-Control-Allow-Origin: *`. Reads
+are whole-file `GET`s, so — unlike tiles — **no `Range` support is
+required** and every request is a CORS simple request (no preflight).
+
+Because the proof is itself a content-addressed IPFS block, a **proof URL
+can point at any trustless gateway** with zero client code — recode the
+anchor to the `raw` codec and request
+`{gateway}/ipfs/{anchor-as-raw}?format=raw`. This v1 does not implement the
+optional gateway *content* sources (A5.1) or cross-session proof
+persistence; both are compatible additions.
+
 ## Creating verified map packages
 
 A package is a plain directory — `map.pmtiles`, `metadata.json`, and a
 `proofs/` tree — identified by one root CID, published by copying it
 anywhere on any static host and/or pinning it to IPFS.
 
-Packaging tooling is not part of this library yet. For now, the format and
-client protocol are specified in the
+Packaging tooling is not part of this library yet. The package format and
+client protocol are specified in [`SPEC.md`](./SPEC.md) (Part 1 — map
+packages; Part 2 — verified assets), so the formats are defined where
+their client lives. The reference build pipeline (PMTiles archive in,
+package + proofs out) lives in the
 [ipfs-pmtiles-demo](https://github.com/guillaumemichel/ipfs-pmtiles-demo)
-repository's
-[SPEC.md](https://github.com/guillaumemichel/ipfs-pmtiles-demo/blob/main/SPEC.md),
-alongside the reference build pipeline (PMTiles archive in, package + CAR
-file out) and a
+repository, alongside a
 [live demo](https://guillaumemichel.github.io/ipfs-pmtiles-demo/) of this
-verification client (try `?tamper=1`). Future work is to move the spec and
-a packaging CLI into this repository, so the format is defined where its
-client lives.
+verification client (try `?tamper=1`). Future work is a packaging CLI in
+this repository.
 
 ## Development
 
 ```sh
 npm ci
-npm test           # 104 tests: unit, golden fixtures from a real package,
-                   # end-to-end through the real pmtiles reader
+npm test           # unit + differential tests, golden fixtures from a real
+                   # package, end-to-end through the real pmtiles reader
 npm run typecheck
 npm run build      # dist/: ESM bundle, minified IIFE, .d.ts
 ```
 
 The library is zero-dependency by design; the canonical IPLD
-implementations (`multiformats`, `@ipld/dag-pb`) and `pmtiles` appear only
-as dev-dependencies, cross-validating the hand-rolled CID/dag-pb encoding
-byte-for-byte in the test suite.
+implementations (`multiformats`, `@ipld/dag-pb`, `@ipld/car`,
+`ipfs-unixfs`, `ipfs-unixfs-importer`, `blockstore-core`) and `pmtiles`
+appear only as dev-dependencies, cross-validating the hand-rolled
+CID / dag-pb / UnixFS / CARv1 handling byte-for-byte in the test suite.
 
 ## License
 

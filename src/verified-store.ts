@@ -34,10 +34,13 @@ interface Inflight {
 
 export class VerifiedStore {
   #sources: ByteSource[];
-  #cache = new Map<string, Uint8Array>(); // digest hex -> bytes, insertion order = LRU
+  #cache = new Map<string, Uint8Array>(); // cache key -> bytes, insertion order = LRU
   #cacheBytes = 0;
   #maxCacheBytes: number;
   #inflight = new Map<string, Inflight>();
+  // Sources that served bytes failing verification: tampering, not transport.
+  // Skipped by every fetch loop for the store's lifetime (A8, ban on tamper).
+  #banned = new Set<ByteSource>();
   stats: VerifyStats = { verified: 0, rejected: 0 };
 
   constructor(sources: ByteSource[], { maxCacheBytes = DEFAULT_CACHE_BYTES }: { maxCacheBytes?: number } = {}) {
@@ -56,6 +59,23 @@ export class VerifiedStore {
     return bytes;
   }
 
+  // Verified whole small file with a caller-supplied check in place of the
+  // fixed digest compare — the primitive behind both a digest-keyed raw read
+  // and a UnixFS file read whose bytes are verified against proof structure.
+  // Same plain GET, cache, in-flight dedup, ordered failover, stats, and bans.
+  async fetchChecked(
+    path: string,
+    cacheKey: string,
+    cap: number,
+    check: (bytes: Uint8Array) => Promise<void>,
+    { signal }: { signal?: AbortSignal } = {},
+  ): Promise<Uint8Array> {
+    signal?.throwIfAborted();
+    const cached = this.getCached(cacheKey);
+    if (cached !== undefined) return cached;
+    return this.#dedup(`whole:${cacheKey}`, signal, (s) => this.#fetchCheckedFrom(path, cacheKey, cap, check, s));
+  }
+
   // Verified whole small file (proof shard, meta) with a known digest:
   // plain GET, hash compare, digest-keyed cache + dedup.
   async fetchWhole(
@@ -64,10 +84,7 @@ export class VerifiedStore {
     cap: number,
     { signal }: { signal?: AbortSignal } = {},
   ): Promise<Uint8Array> {
-    signal?.throwIfAborted();
-    const cached = this.getCached(digest);
-    if (cached !== undefined) return cached;
-    return this.#dedup(`whole:${digest}`, signal, (s) => this.#fetchWholeFrom(path, digest, cap, s));
+    return this.fetchChecked(path, digest, cap, (bytes) => verifyDigest(digest, bytes, path), { signal });
   }
 
   // Verified slices for a run of file-contiguous leaves, aligned with
@@ -97,6 +114,7 @@ export class VerifiedStore {
     return this.#dedup(`spec:${path}:${start}+${length}`, signal, async (s) => {
       const errors: unknown[] = [];
       for (const source of this.#sources) {
+        if (this.#banned.has(source)) continue;
         try {
           return await source.fetchRange(path, start, length, { signal: s });
         } catch (err) {
@@ -186,18 +204,28 @@ export class VerifiedStore {
     }
   }
 
-  async #fetchWholeFrom(path: string, digest: string, cap: number, signal: AbortSignal): Promise<Uint8Array> {
+  async #fetchCheckedFrom(
+    path: string,
+    cacheKey: string,
+    cap: number,
+    check: (bytes: Uint8Array) => Promise<void>,
+    signal: AbortSignal,
+  ): Promise<Uint8Array> {
     const errors: unknown[] = [];
     for (const source of this.#sources) {
+      if (this.#banned.has(source)) continue;
       try {
         const bytes = await source.fetchWhole(path, cap, { signal });
-        await verifyDigest(digest, bytes, path);
+        await check(bytes);
         this.stats.verified++;
-        this.#cachePut(digest, bytes);
+        this.#cachePut(cacheKey, bytes);
         return bytes;
       } catch (err) {
         if (signal.aborted) throw err;
-        if (err instanceof VerificationError) this.stats.rejected++;
+        if (err instanceof VerificationError) {
+          this.stats.rejected++;
+          this.#banned.add(source);
+        }
         errors.push(err);
       }
     }
@@ -213,6 +241,7 @@ export class VerifiedStore {
   ): Promise<Uint8Array[]> {
     const errors: unknown[] = [];
     for (const source of this.#sources) {
+      if (this.#banned.has(source)) continue;
       try {
         const body = await source.fetchRange(path, start, total, { signal });
         // Ranged lengths are known from the proofs; enforce before hashing.
@@ -233,7 +262,10 @@ export class VerifiedStore {
         return slices;
       } catch (err) {
         if (signal.aborted) throw err;
-        if (err instanceof VerificationError) this.stats.rejected++;
+        if (err instanceof VerificationError) {
+          this.stats.rejected++;
+          this.#banned.add(source);
+        }
         errors.push(err);
       }
     }
@@ -243,6 +275,7 @@ export class VerifiedStore {
   async #fetchUnverifiedFrom(path: string, cap: number, signal: AbortSignal): Promise<Uint8Array> {
     const errors: unknown[] = [];
     for (const source of this.#sources) {
+      if (this.#banned.has(source)) continue;
       try {
         return await source.fetchWhole(path, cap, { signal });
       } catch (err) {

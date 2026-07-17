@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>veritiles + verified assets (style + glyphs)</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+    <script src="https://unpkg.com/pmtiles@4.4.1/dist/pmtiles.js"></script>
+    <!-- For local development against this checkout, run `npm run build`
+         and swap in ../dist/veritiles.js -->
+    <script src="https://unpkg.com/veritiles@0.2.0/dist/veritiles.js"></script>
+    <style>
+        body { margin: 0; }
+        #map { position: absolute; inset: 0; }
+        #badge {
+            position: absolute; top: 10px; right: 10px; z-index: 1;
+            background: rgba(255, 255, 255, 0.9); border-radius: 4px;
+            padding: 6px 10px; font: 13px/1.4 monospace;
+        }
+        #badge .rejected { color: #c0392b; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="badge">loading…</div>
+    <!-- Everything this page renders is hash-verified before use: tiles
+         against MAP_ROOT (range reads), the style against STYLE_CID (a raw
+         artifact — its own bytes are the trust input), and every glyph range
+         against FONTS_ANCHOR (a DAG artifact: ./assets/fonts mirrors the
+         directory, ./assets/fonts.car is its proof; the two could live on
+         different hosts). The style and glyphs are fixture files in this
+         repo, so serve the checkout over HTTP (WebCrypto needs a secure
+         context; localhost qualifies):
+
+             npx serve            # or: python3 -m http.server
+             http://localhost:3000/examples/assets.html
+
+         Regenerate the fixture with `node examples/build-assets.ts` — it
+         round-trips the artifacts through VerifiedAsset and fails if the
+         anchors below drift. Only glyph ranges 0-511 ship with the example;
+         a range it lacks is an authenticated absence and renders empty. -->
+    <script type="module">
+        const MAP_ROOT = 'bafybeihnila5l5dabqrbpvaictnce5wop364y5kbc7kfowbnd5mbnpayci';
+        const STYLE_CID = 'bafkreic5q32hdgp3yrzer6vvjlk4rzap4yn7btrqw3y7ydbl7h3rhqwh4y';
+        const FONTS_ANCHOR = 'bagbaiera5mqjy7zo4yquou3t76ykbrjw3irwxq6l3hxrtivkfgy4a7q5t6pa';
+
+        const badge = document.getElementById('badge');
+        try {
+            // Tiles: verified range reads over the published map package.
+            const tiles = new veritiles.VerifiedSource({
+                rootCid: MAP_ROOT,
+                source: `https://guillaumemichel.github.io/ipfs-pmtiles-demo/ipfs/${MAP_ROOT}`,
+            });
+            const protocol = new pmtiles.Protocol();
+            maplibregl.addProtocol('pmtiles', protocol.tile);
+            protocol.add(new pmtiles.PMTiles(tiles)); // before the style loads
+
+            // Glyphs: a DAG artifact. The verified:// URLs inside the style
+            // carry the trust anchor, never a location — the registry maps the
+            // anchor to this instance, whose URLs come from page config.
+            const fonts = new veritiles.VerifiedAsset({
+                cid: FONTS_ANCHOR,
+                source: './assets/fonts', // proof defaults to ./assets/fonts.car
+            });
+            maplibregl.addProtocol('verified', veritiles.assetProtocol([fonts]));
+
+            // Style: a raw artifact — fetched, hashed against STYLE_CID, then
+            // handed to MapLibre. It references pmtiles://MAP_ROOT and
+            // verified://FONTS_ANCHOR/…, so the page is host-independent.
+            const styleAsset = new veritiles.VerifiedAsset({
+                cid: STYLE_CID,
+                source: './assets/style.json',
+            });
+            const style = JSON.parse(new TextDecoder().decode(await styleAsset.bytes()));
+
+            const map = new maplibregl.Map({ container: 'map', center: [0, 20], zoom: 2, style });
+            map.on('error', (e) => console.error('map error:', e.error ?? e));
+
+            setInterval(() => {
+                const sum = (k) => tiles.stats[k] + fonts.stats[k] + styleAsset.stats[k];
+                badge.innerHTML = `✓ ${sum('verified')} hashes verified` +
+                    (sum('rejected') ? ` / <span class="rejected">✗ ${sum('rejected')} tampered</span>` : '');
+            }, 500);
+        } catch (err) {
+            console.error(err);
+            badge.textContent = `✗ ${err instanceof AggregateError ? err.errors[0] : err}`;
+        }
+    </script>
+</body>
+</html>

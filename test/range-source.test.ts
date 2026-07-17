@@ -107,3 +107,40 @@ test('encodePath percent-encodes each segment', () => {
     'fonts/Noto%20Sans%20Regular/0-255.pbf',
   );
 });
+
+// --- A5: the empty-path tweak (decision 9) ---
+
+test('R-01 fetchWhole("") requests the base itself with no trailing slash', async () => {
+  const urls: string[] = [];
+  const source = new RangeSource('https://h/style.json', {
+    fetchFn: rangeFetchAt('https://h/style.json', data, urls),
+  });
+  await source.fetchWhole('', 4096);
+  assert.deepEqual(urls, ['https://h/style.json']);
+});
+
+test('R-02 trailing slashes are stripped once; members request base/<path>', async () => {
+  const urls: string[] = [];
+  const source = new RangeSource('https://h/fonts///', {
+    fetchFn: rangeFetchAt('https://h/fonts/a.pbf', data, urls),
+  });
+  await source.fetchWhole('a.pbf', 4096);
+  assert.deepEqual(urls, ['https://h/fonts/a.pbf']);
+});
+
+test('R-03 a nonempty path still percent-encodes each segment', async () => {
+  const urls: string[] = [];
+  const source = new RangeSource('https://h', {
+    fetchFn: rangeFetchAt('https://h/x%20y/z', data, urls),
+  });
+  await source.fetchWhole('x y/z', 4096);
+  assert.deepEqual(urls, ['https://h/x%20y/z']);
+});
+
+// Serves `bytes` for any URL, recording each requested URL.
+function rangeFetchAt(_expect: string, bytes: Uint8Array, log: string[]): typeof fetch {
+  return (async (url: string | URL | Request) => {
+    log.push(String(url));
+    return new Response(new Uint8Array(bytes), { status: 200 });
+  }) as typeof fetch;
+}

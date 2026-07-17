@@ -1,0 +1,66 @@
+{
+  "version": 8,
+  "sources": {
+    "pmtiles-source": {
+      "type": "vector",
+      "url": "pmtiles://bafybeihnila5l5dabqrbpvaictnce5wop364y5kbc7kfowbnd5mbnpayci",
+      "attribution": "<a href=\"https://github.com/protomaps/basemaps\">Protomaps</a> © <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors"
+    }
+  },
+  "glyphs": "verified://bagbaiera5mqjy7zo4yquou3t76ykbrjw3irwxq6l3hxrtivkfgy4a7q5t6pa/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#f0f8ff"
+      }
+    },
+    {
+      "id": "land",
+      "type": "fill",
+      "source": "pmtiles-source",
+      "source-layer": "land",
+      "paint": {
+        "fill-color": "#f8f4f0"
+      }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "pmtiles-source",
+      "source-layer": "water",
+      "paint": {
+        "fill-color": "#a0c8f0"
+      }
+    },
+    {
+      "id": "places",
+      "type": "symbol",
+      "source": "pmtiles-source",
+      "source-layer": "places",
+      "layout": {
+        "text-field": [
+          "coalesce",
+          [
+            "get",
+            "name:en"
+          ],
+          [
+            "get",
+            "name"
+          ]
+        ],
+        "text-size": 12,
+        "text-font": [
+          "Noto Sans Regular"
+        ]
+      },
+      "paint": {
+        "text-color": "#333333",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1
+      }
+    }
+  ]
+}

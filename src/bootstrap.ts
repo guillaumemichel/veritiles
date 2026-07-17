@@ -20,7 +20,7 @@ import {
 import { encodeDirNode } from './dag-pb.ts';
 import { DIGEST_HEX_RE, equalBytes, sha256, VerificationError } from './verify.ts';
 
-const FORMAT_VERSION = 2;
+const FORMAT_VERSION = 1;
 const METADATA_NAME = 'metadata.json';
 const METADATA_CAP = 1024 * 1024;
 const MAX_CHILDREN = 64;

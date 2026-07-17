@@ -10,6 +10,7 @@ import { VerificationError } from './verify.ts';
 
 export const RAW_CODE = 0x55;
 export const DAG_PB_CODE = 0x70;
+export const CAR_CODE = 0x0202;
 export const SHA2_256_CODE = 0x12;
 
 export interface Cid {
@@ -18,6 +19,56 @@ export interface Cid {
   digest: Uint8Array;
   /** The full binary CID, exactly as embedded in dag-pb links. */
   bytes: Uint8Array;
+}
+
+// The anchor gate (A2): a CIDv1, base32, sha2-256, 32-byte digest whose codec
+// declares the artifact kind — raw (the content itself) or car (a proof file).
+// Anything else rejects; clients MUST NOT sniff bodies to decide.
+export function parseAnchorCid(text: unknown): Cid {
+  const cid = parseCid(text, 'anchor');
+  if (cid.hashCode !== SHA2_256_CODE || cid.digest.length !== 32) {
+    throw new VerificationError('anchor: CID must be sha2-256 with a 32-byte digest');
+  }
+  if (cid.codec !== RAW_CODE && cid.codec !== CAR_CODE) {
+    throw new VerificationError('anchor: CID codec must be raw or car');
+  }
+  return cid;
+}
+
+// A CID referenced from inside the DAG (A6): sha2-256, 32-byte digest, codec
+// raw (a leaf) or dag-pb (a node). Accepting fewer shapes can only reject an
+// artifact, never mis-verify one.
+export function assertNodeLinkCid(cid: Cid, label: string): void {
+  if (cid.hashCode !== SHA2_256_CODE || cid.digest.length !== 32) {
+    throw new VerificationError(`${label}: link CID must be sha2-256 with a 32-byte digest`);
+  }
+  if (cid.codec !== RAW_CODE && cid.codec !== DAG_PB_CODE) {
+    throw new VerificationError(`${label}: link CID codec must be raw or dag-pb`);
+  }
+}
+
+// Decode one binary CIDv1 embedded in a larger byte stream (a dag-pb link Hash
+// field, a CAR section), reading at `cursor` and leaving it positioned exactly
+// after the CID's last digest byte. The returned `bytes` is the CID slice.
+export function decodeCidBytes(bytes: Uint8Array, cursor: { pos: number }, label: string): Cid {
+  const start = cursor.pos;
+  const version = readVarint(bytes, cursor, label);
+  if (version !== 1) throw new VerificationError(`${label}: CID is not version 1`);
+  const codec = readVarint(bytes, cursor, label);
+  const hashCode = readVarint(bytes, cursor, label);
+  const digestLength = readVarint(bytes, cursor, label);
+  const digestStart = cursor.pos;
+  const digestEnd = digestStart + digestLength;
+  if (digestEnd > bytes.length) {
+    throw new VerificationError(`${label}: truncated CID digest`);
+  }
+  cursor.pos = digestEnd;
+  return {
+    codec,
+    hashCode,
+    digest: bytes.subarray(digestStart, digestEnd),
+    bytes: bytes.subarray(start, digestEnd),
+  };
 }
 
 const BASE32 = 'abcdefghijklmnopqrstuvwxyz234567';
@@ -58,11 +109,22 @@ export function formatCidV1(codec: number, sha256Digest: Uint8Array): string {
 }
 
 function cidV1Bytes(codec: number, digest: Uint8Array): Uint8Array {
-  if (codec > 0x7f) throw new VerificationError(`unsupported codec ${codec}`);
-  const bytes = new Uint8Array(4 + digest.length);
-  bytes.set([1, codec, SHA2_256_CODE, digest.length]);
-  bytes.set(digest, 4);
+  const prefix = [...encodeVarint(1), ...encodeVarint(codec), ...encodeVarint(SHA2_256_CODE), ...encodeVarint(digest.length)];
+  const bytes = new Uint8Array(prefix.length + digest.length);
+  bytes.set(prefix);
+  bytes.set(digest, prefix.length);
   return bytes;
+}
+
+// Unsigned LEB128 encoder — codecs above 0x7f (e.g. car 0x0202) need two bytes.
+function encodeVarint(value: number): number[] {
+  const out: number[] = [];
+  while (value >= 0x80) {
+    out.push((value & 0x7f) | 0x80);
+    value >>>= 7;
+  }
+  out.push(value);
+  return out;
 }
 
 // RFC 4648 base32, lowercase, no padding (multibase 'b'). Strict: unknown
@@ -107,7 +169,7 @@ function base32Encode(bytes: Uint8Array): string {
 }
 
 // Unsigned LEB128, capped at 5 bytes (< 2^35) — far above any multicodec.
-function readVarint(bytes: Uint8Array, cursor: { pos: number }, label: string): number {
+export function readVarint(bytes: Uint8Array, cursor: { pos: number }, label: string): number {
   let value = 0;
   for (let shift = 0; shift < 35; shift += 7) {
     if (cursor.pos >= bytes.length) {
