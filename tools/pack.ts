@@ -1,4 +1,5 @@
-// The veritiles packer (devDependencies only — NOT part of the shipped bundle).
+// The veritiles packer is a repository development tool. It is not included
+// in the published library package.
 // Turns a file into a verified pair: its raw whole-file CID and a dag-cbor
 // descriptor plus a meta/shard tree of static files (PLAN-shards §3).
 // `verify` opens a real VerifiedFile over the emitted package and spot-reads
@@ -9,6 +10,8 @@
 //   npm run pack -- verify --cid b… --file <path> --proofs <dir> [--reads 64]
 
 import { CarWriter } from '@ipld/car';
+import { MemoryBlockstore } from 'blockstore-core/memory';
+import { importer } from 'ipfs-unixfs-importer';
 import { fixedSize } from 'ipfs-unixfs-importer/chunker';
 import { CID } from 'multiformats/cid';
 import * as Digest from 'multiformats/hashes/digest';
@@ -60,10 +63,14 @@ export interface Packed {
   anchor: string;
   /** The content's raw whole-file CID. */
   mapCid: string;
+  /** Optional standard UnixFS root for external IPFS pinning. */
+  unixfsCid?: string;
   descriptor: Uint8Array;
   /** Proof-base-relative files: 'root', '{hex}', '{hex}/meta', … */
   proofs: Map<string, Uint8Array>;
   leafCount: number;
+  /** Every block in the optional UnixFS DAG, suitable for `ipfs dag import`. */
+  fullCar?: Uint8Array;
   /** The byte lengths emitted by a content-aware profile, when applicable. */
   cuts?: number[];
 }
@@ -73,6 +80,8 @@ export interface PmtilesOptions {
   tileGroupBytes?: number;
   /** Alias for the CLI's `--tile-group` option. */
   tileGroup?: number;
+  /** Add an independent, standard 256 KiB UnixFS representation. */
+  unixfs?: boolean;
 }
 
 export interface ParsedPmtiles {
@@ -90,9 +99,9 @@ export interface ParsedPmtiles {
 
 // Fixed-size chunking (the `fixed` profile). `fixedSize({ chunkSize: N })` is
 // byte-identical to kubo `ipfs add --cid-version 1 --chunker size-N`.
-export async function packFixed(bytes: Uint8Array, opts: { chunkSize?: number } = {}): Promise<Packed> {
+export async function packFixed(bytes: Uint8Array, opts: { chunkSize?: number; unixfs?: boolean } = {}): Promise<Packed> {
   const chunkSize = opts.chunkSize ?? DEFAULT_CHUNK;
-  return packWithChunker(bytes, fixedSize({ chunkSize }), {});
+  return packWithChunker(bytes, fixedSize({ chunkSize }), { unixfs: opts.unixfs });
 }
 
 /** Pack a PMTiles v3 archive using the profile from PLAN-shards §3 (zoom-shaped). */
@@ -106,6 +115,7 @@ export async function packPmtiles(bytes: Uint8Array, opts: PmtilesOptions = {}):
   const cuts = cutLengths(pmtilesCutPoints(bytes, parsed, groups));
   return packWithChunker(bytes, cutChunker(cuts), {
     cuts,
+    unixfs: opts.unixfs,
     bands: (leaves) => pmtilesBands(leaves, parsed.header.tileDataOffset, groups),
   });
 }
@@ -120,7 +130,7 @@ export interface PackOptions extends PmtilesOptions {
 /** Select the PMTiles profile by magic/version, unless the caller overrides it. */
 export async function pack(bytes: Uint8Array, opts: PackOptions = {}): Promise<Packed> {
   if (opts.profile === 'fixed' || !isPmtilesV3(bytes)) {
-    return packFixed(bytes, { chunkSize: opts.chunkSize });
+    return packFixed(bytes, { chunkSize: opts.chunkSize, unixfs: opts.unixfs });
   }
   return packPmtiles(bytes, opts);
 }
@@ -128,7 +138,7 @@ export async function pack(bytes: Uint8Array, opts: PackOptions = {}): Promise<P
 async function packWithChunker(
   bytes: Uint8Array,
   chunker: (source: AsyncIterable<Uint8Array>) => AsyncIterable<Uint8Array>,
-  opts: { cuts?: number[]; bands?: (leaves: RawLeaf[]) => RawLeaf[][] },
+  opts: { cuts?: number[]; bands?: (leaves: RawLeaf[]) => RawLeaf[][]; unixfs?: boolean },
 ): Promise<Packed> {
   const leaves: RawLeaf[] = [];
   let offset = 0;
@@ -139,9 +149,15 @@ async function packWithChunker(
   }
   if (offset !== bytes.length) throw new Error('chunker did not cover input');
   const mapCid = CID.createV1(RAW_CODE, Digest.create(SHA2_256, sha256Bytes(bytes)));
+  const unixfs = opts.unixfs ? await importUnixfs(bytes) : undefined;
   const bands = opts.bands ? opts.bands(leaves) : [leaves];
   const tree = buildProofTree(bands);
-  const descriptor = encodeDescriptor({ mapCidBytes: mapCid.bytes, topMeta: tree.topMeta, mapSize: bytes.length });
+  const descriptor = encodeDescriptor({
+    mapCidBytes: mapCid.bytes,
+    ...(unixfs === undefined ? {} : { unixfsCidBytes: unixfs.root.bytes }),
+    topMeta: tree.topMeta,
+    mapSize: bytes.length,
+  });
   if (descriptor.length > DESCRIPTOR_CAP) {
     throw new Error(`descriptor exceeds the ${DESCRIPTOR_CAP}-byte cap — split the proof tree deeper`);
   }
@@ -151,11 +167,48 @@ async function packWithChunker(
   return {
     anchor,
     mapCid: mapCid.toString(),
+    ...(unixfs === undefined ? {} : { unixfsCid: unixfs.root.toString(), fullCar: await writeCar(unixfs.root, unixfs.blocks) }),
     descriptor,
     proofs,
     leafCount: leaves.length,
     ...(opts.cuts ? { cuts: opts.cuts } : {}),
   };
+}
+
+class RecordingBlockstore extends MemoryBlockstore {
+  recorded = new Map<string, { cid: CID; bytes: Uint8Array }>();
+
+  override async put(cid: CID, bytes: Uint8Array): Promise<CID> {
+    this.recorded.set(cid.toString(), { cid, bytes });
+    return super.put(cid, bytes) as Promise<CID>;
+  }
+}
+
+// This intentionally does not use ranges-proof cuts. It reproduces a normal
+// Kubo file import, so a mirror can regenerate this CID from the file alone.
+async function importUnixfs(bytes: Uint8Array): Promise<{ root: CID; blocks: { cid: CID; bytes: Uint8Array }[] }> {
+  const blockstore = new RecordingBlockstore();
+  let root: CID | undefined;
+  for await (const entry of importer([{ content: bytes }], blockstore, {
+    cidVersion: 1,
+    rawLeaves: true,
+    chunker: fixedSize({ chunkSize: 262144 }),
+  })) root = entry.cid;
+  if (root === undefined) throw new Error('UnixFS importer produced no root');
+  return { root, blocks: [...blockstore.recorded.values()] };
+}
+
+async function writeCar(root: CID, blocks: { cid: CID; bytes: Uint8Array }[]): Promise<Uint8Array> {
+  const { writer, out } = CarWriter.create([root]);
+  const chunks: Uint8Array[] = [];
+  const drain = (async () => { for await (const chunk of out) chunks.push(chunk); })();
+  for (const block of blocks) await writer.put(block);
+  await writer.close();
+  await drain;
+  const car = new Uint8Array(chunks.reduce((length, chunk) => length + chunk.length, 0));
+  let offset = 0;
+  for (const chunk of chunks) { car.set(chunk, offset); offset += chunk.length; }
+  return car;
 }
 
 // ---------------------------------------------------------------------------
@@ -651,13 +704,16 @@ async function main(argv: string[]): Promise<void> {
     return;
   }
   const input = argv[0];
-  if (!input) throw new Error('usage: pack <input> [--profile auto|fixed|pmtiles] [--chunk N] [--tile-group N] [--out dir]');
+  if (!input) throw new Error('usage: pack <input> [--profile auto|fixed|pmtiles] [--chunk N] [--tile-group N] [--unixfs] [--full-car pin.car] [--out dir]');
   const opts = flags(argv.slice(1));
+  if (opts['full-car'] === 'true') throw new Error('--full-car requires an output path');
+  if (opts['full-car'] !== undefined && opts.unixfs !== 'true') throw new Error('--full-car requires --unixfs');
   const bytes = await readInput(input);
   const packed = await pack(bytes, {
     profile: opts.profile as PackProfile | undefined,
     chunkSize: opts.chunk ? parseChunk(opts.chunk) : undefined,
     tileGroupBytes: opts['tile-group'] ? parseChunk(opts['tile-group']) : undefined,
+    unixfs: opts.unixfs === 'true',
   });
   const out = opts.out ?? `${input}.proofs`;
   for (const [path, content] of packed.proofs) {
@@ -665,10 +721,10 @@ async function main(argv: string[]): Promise<void> {
     await mkdir(dirname(file), { recursive: true });
     await writeFile(file, content);
   }
-  if (opts['full-car']) throw new Error('--full-car requires --unixfs and is not available in this build');
+  if (opts['full-car']) await writeFile(opts['full-car'], packed.fullCar!);
   process.stdout.write(`${packed.anchor}\n`);
   process.stderr.write(
-    `proofs: ${out}/ (${packed.leafCount} leaves, ${packed.proofs.size} files, descriptor ${packed.descriptor.length} bytes)\nmap: ${packed.mapCid}\n`,
+    `proofs: ${out}/ (${packed.leafCount} leaves, ${packed.proofs.size} files, descriptor ${packed.descriptor.length} bytes)\nmap: ${packed.mapCid}${packed.unixfsCid === undefined ? '' : `\nunixfs: ${packed.unixfsCid}`}\n`,
   );
 }
 

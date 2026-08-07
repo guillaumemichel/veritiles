@@ -6,6 +6,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { CarReader } from '@ipld/car';
+import { MemoryBlockstore } from 'blockstore-core/memory';
+import { importer } from 'ipfs-unixfs-importer';
+import { fixedSize } from 'ipfs-unixfs-importer/chunker';
 import { CID } from 'multiformats/cid';
 
 import {
@@ -55,6 +58,28 @@ test('T-04 the descriptor binds the map CID, size, and a covering top meta', asy
   const { covered } = decodeMeta(d.topMeta, 0);
   assert.equal(covered, bytes.length);
   assert.equal(packed.proofs.get('root'), packed.descriptor);
+});
+
+test('T-04a --unixfs emits a standard UnixFS root and a pinnable CAR without changing map CID', async () => {
+  const plain = await packFixed(bytes, { chunkSize: 262144 });
+  const packed = await packFixed(bytes, { chunkSize: 262144, unixfs: true });
+  const descriptor = decodeDescriptor(packed.descriptor);
+  assert.equal(packed.mapCid, plain.mapCid);
+  assert.ok(packed.unixfsCid);
+  assert.ok(packed.fullCar);
+  assert.equal(CID.decode(descriptor.unixfsCid!.bytes).toString(), packed.unixfsCid);
+
+  const store = new MemoryBlockstore();
+  let expected: CID | undefined;
+  for await (const entry of importer([{ content: bytes }], store, {
+    cidVersion: 1,
+    rawLeaves: true,
+    chunker: fixedSize({ chunkSize: 262144 }),
+  })) expected = entry.cid;
+  assert.equal(packed.unixfsCid, expected!.toString());
+
+  const reader = await CarReader.fromBytes(packed.fullCar);
+  assert.ok(await reader.get(expected!));
 });
 
 

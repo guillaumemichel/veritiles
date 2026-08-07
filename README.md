@@ -18,8 +18,8 @@ pieces covering what it reads — a tile fetch costs at most a couple of small
 proof files, even for a planet-size archive — and verifies every byte against
 the sha2-256 chain rooted in the anchor (see [`SPEC.md`](./SPEC.md)).
 
-- **Zero dependencies** — ~30 KB minified, including the CID, CBOR,
-  protobuf, and CAR handling. WebCrypto is the only cryptography.
+- **Zero dependencies** — ~30 KB minified, including CID, DRISL/CBOR, and
+  CAR handling. WebCrypto is the only cryptography.
 - **Zero per-tile overhead** — a warm tile read is one exact `Range`
   request, the same bytes an unverified client would fetch.
 - **One round trip for cold tiles** — tile data is fetched speculatively in
@@ -190,10 +190,11 @@ proof size is ~37 bytes per leaf — but you never fetch all of it.
 ### IPFS compatibility (optional)
 
 No IPFS anywhere is required — a dumb static host is the normative
-mechanism. If you do use IPFS: the descriptor embeds the archive's UnixFS
-root CID (exactly what `ipfs add --cid-version 1` prints), so any gateway
-or pinning service holding the same file is a valid _content_ source, and
-`veritiles` CIDs inter-operate with standard tooling.
+mechanism. Use `--unixfs` while packing to embed a reproducible UnixFS root
+CID (the standard 256 KiB fixed-chunk `ipfs add --cid-version 1` layout).
+Then pin the emitted `--full-car` output, or import it with `ipfs dag import`;
+a gateway holding that DAG is a valid configured _content_ source. The client
+continues to verify gateway range responses against the veritiles proof tree.
 
 ## Verified assets
 
@@ -205,9 +206,9 @@ for tiles. The anchor's codec says what it names:
 
 - **raw anchor** (`bafkrei…`) — a single file ≤ 256 KiB (a typical
   `style.json`). The content is self-verifying; no proof exists.
-- **dag-pb anchor** (`bafybei…`) — a UnixFS file or directory of any size.
-  The proof CAR carries the DAG's internal nodes, verified lazily against
-  the anchor. Proof and content are independently hostable.
+- **dag-cbor anchor** (`bafyrei…`) — a strict MASL bundle. Its CAR contains
+  the authenticated manifest and may include small raw files; every resource
+  maps a path to a raw whole-file CID and declared size.
 
 ```js
 import { VerifiedAsset, assetProtocol } from "veritiles";
@@ -246,9 +247,8 @@ location**: the registry maps the anchor to a client instance whose URLs
 come from page configuration, so styles stay host-independent and are
 themselves pinnable artifacts.
 
-`VerifiedAsset` options mirror `VerifiedFile` (`cid`, `source`, `proof`,
-`fetchFn`, `maxCacheBytes`, `maxProofBytes`, `maxFileBytes`,
-`checkProofCompleteness`). `bytes(path?,
+`VerifiedAsset` options are `cid`, `source`, `proof`, `fetchFn`,
+`maxCacheBytes`, `maxProofBytes`, and `maxFileBytes`. `bytes(path?,
 { signal? })` returns the file at `path` (`''`, the default, is the artifact
 itself), a fresh copy each call. `NotFoundError` is an **authenticated
 absence** — the artifact provably lacks that path (distinct from a host's
@@ -259,10 +259,28 @@ HTTPS and `Access-Control-Allow-Origin: *` — reads are whole-file `GET`s, so
 
 ## Creating verified content
 
+The packer is a repository development tool, not part of the published
+`veritiles` npm package. Clone this repository and install its development
+dependencies before running it:
+
+```sh
+git clone https://github.com/guillaumemichel/veritiles.git
+cd veritiles
+npm ci
+```
+
 ```sh
 npm run pack -- map.pmtiles
 # → writes map.pmtiles.proofs/  (descriptor + proof tree)
 # → prints the anchor CID (bafyrei…) to stdout
+
+# Optional IPFS bridge for the same archive:
+npm run pack -- map.pmtiles --unixfs --full-car map.car
+# → prints a descriptor anchor and its UnixFS CID
+# → writes map.car for `ipfs dag import` / pinning
+
+# A verified path-addressed asset bundle:
+npm run pack -- assets ./public --out assets.car
 ```
 
 Upload `map.pmtiles` and `map.pmtiles.proofs/` to any static host and
@@ -288,11 +306,11 @@ npm run typecheck
 npm run build      # dist/: ESM bundle, minified IIFE (~30 KB), .d.ts
 ```
 
-The library is zero-dependency by design; the canonical IPLD
-implementations (`multiformats`, `@ipld/dag-pb`, `@ipld/car`,
-`ipfs-unixfs`, `ipfs-unixfs-importer`, `blockstore-core`) and `pmtiles`
-appear only as dev-dependencies, cross-validating the hand-rolled
-CID / dag-pb / UnixFS / CAR handling byte-for-byte in the test suite.
+The library is zero-dependency by design. Canonical IPLD implementations
+(`multiformats`, `@ipld/dag-cbor`, `@ipld/dag-pb`, `@ipld/car`,
+`ipfs-unixfs-importer`, `blockstore-core`) and `pmtiles` are dev-dependencies
+only. They cross-check CID, DRISL/MASL, CAR, and optional UnixFS publishing
+output in the test suite.
 
 ## License
 
