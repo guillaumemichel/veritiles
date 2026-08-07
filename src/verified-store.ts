@@ -2,11 +2,10 @@
 // digest-keyed LRU cache, in-flight de-duplication, strict verification,
 // verified/rejected stats, and ordered failover (a source that returns wrong
 // or missing bytes is skipped in favour of the next). Sources hand up
-// UNVERIFIED bytes; nothing leaves here unverified except fetchUnverified,
-// whose single caller (bootstrap) authenticates the bytes afterwards by
-// reconstructing the root CID from them.
+// unverified bytes only to the speculative range path, which authenticates
+// them before caching or returning them.
 
-import type { Leaf } from './proof-format.ts';
+import type { Leaf } from './ranged-reader.ts';
 import { VerificationError, verifyDigest } from './verify.ts';
 
 const DEFAULT_CACHE_BYTES = 64 * 1024 * 1024;
@@ -39,14 +38,25 @@ export class VerifiedStore {
   #maxCacheBytes: number;
   #inflight = new Map<string, Inflight>();
   // Sources that served bytes failing verification: tampering, not transport.
-  // Skipped by every fetch loop for the store's lifetime (A8, ban on tamper).
+  // Skipped by every fetch loop for the store's lifetime (SPEC §6.2, ban on tamper).
   #banned = new Set<ByteSource>();
   stats: VerifyStats = { verified: 0, rejected: 0 };
 
-  constructor(sources: ByteSource[], { maxCacheBytes = DEFAULT_CACHE_BYTES }: { maxCacheBytes?: number } = {}) {
+  constructor(
+    sources: ByteSource[],
+    { maxCacheBytes = DEFAULT_CACHE_BYTES, stats }: { maxCacheBytes?: number; stats?: VerifyStats } = {},
+  ) {
     if (!sources?.length) throw new Error('at least one source is required');
     this.#sources = sources;
     this.#maxCacheBytes = maxCacheBytes;
+    if (stats !== undefined) this.stats = stats;
+  }
+
+  // Insert already-verified bytes into the cache without re-hashing or
+  // counting — for a block the caller verified elsewhere (e.g. a raw anchor's
+  // single leaf, which IS the root block hashed at open).
+  cacheVerified(key: string, bytes: Uint8Array): void {
+    this.#cachePut(key, bytes);
   }
 
   // Verified cached bytes for a digest (LRU-refreshed), or undefined. Lets
@@ -61,13 +71,13 @@ export class VerifiedStore {
 
   // Verified whole small file with a caller-supplied check in place of the
   // fixed digest compare — the primitive behind both a digest-keyed raw read
-  // and a UnixFS file read whose bytes are verified against proof structure.
+  // and a bundle file read whose bytes are verified against its raw CID.
   // Same plain GET, cache, in-flight dedup, ordered failover, stats, and bans.
   async fetchChecked(
     path: string,
     cacheKey: string,
     cap: number,
-    check: (bytes: Uint8Array) => Promise<void>,
+    check: (bytes: Uint8Array) => Promise<number | void>,
     { signal }: { signal?: AbortSignal } = {},
   ): Promise<Uint8Array> {
     signal?.throwIfAborted();
@@ -159,13 +169,6 @@ export class VerifiedStore {
     }
   }
 
-  // UNVERIFIED whole file — bootstrap only: metadata.json cannot be checked
-  // until its own bytes rebuild the root CID. Never cached here.
-  async fetchUnverified(path: string, cap: number, { signal }: { signal?: AbortSignal } = {}): Promise<Uint8Array> {
-    signal?.throwIfAborted();
-    return this.#dedup(`raw:${path}`, signal, (s) => this.#fetchUnverifiedFrom(path, cap, s));
-  }
-
   // Ref-counted in-flight de-duplication with correct shared-abort semantics:
   // one consumer aborting must not cancel a fetch another still awaits, and a
   // consumer that joins after the last one aborted must start a fresh fetch
@@ -208,7 +211,7 @@ export class VerifiedStore {
     path: string,
     cacheKey: string,
     cap: number,
-    check: (bytes: Uint8Array) => Promise<void>,
+    check: (bytes: Uint8Array) => Promise<number | void>,
     signal: AbortSignal,
   ): Promise<Uint8Array> {
     const errors: unknown[] = [];
@@ -216,8 +219,8 @@ export class VerifiedStore {
       if (this.#banned.has(source)) continue;
       try {
         const bytes = await source.fetchWhole(path, cap, { signal });
-        await check(bytes);
-        this.stats.verified++;
+        const checks = (await check(bytes)) ?? 1;
+        this.stats.verified += checks;
         this.#cachePut(cacheKey, bytes);
         return bytes;
       } catch (err) {
@@ -270,20 +273,6 @@ export class VerifiedStore {
       }
     }
     throw new AggregateError(errors, `all sources failed for run on ${path}`);
-  }
-
-  async #fetchUnverifiedFrom(path: string, cap: number, signal: AbortSignal): Promise<Uint8Array> {
-    const errors: unknown[] = [];
-    for (const source of this.#sources) {
-      if (this.#banned.has(source)) continue;
-      try {
-        return await source.fetchWhole(path, cap, { signal });
-      } catch (err) {
-        if (signal.aborted) throw err;
-        errors.push(err);
-      }
-    }
-    throw new AggregateError(errors, `all sources failed for ${path}`);
   }
 
   #cachePut(key: string, bytes: Uint8Array): void {

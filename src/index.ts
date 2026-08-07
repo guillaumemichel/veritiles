@@ -1,7 +1,10 @@
+export { VerifiedFile } from './verified-file.ts';
+export type { VerifiedFileOptions } from './verified-file.ts';
 export { VerifiedSource } from './source.ts';
-export type { RangeResponse, VerifiedSourceOptions } from './source.ts';
+export type { RangeResponse } from './source.ts';
 export { NotFoundError, VerifiedAsset } from './asset.ts';
-export type { VerifiedAssetOptions } from './asset.ts';
+export type { AssetStat, VerifiedAssetOptions } from './asset.ts';
+export type { ManifestEntry } from './manifest.ts';
 export { assetProtocol } from './asset-protocol.ts';
 export type { VerifyStats } from './verified-store.ts';
 export { VerificationError } from './verify.ts';

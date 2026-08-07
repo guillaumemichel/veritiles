@@ -1,9 +1,9 @@
-// Binary proof formats — the client-side (decode/validate) half of the wire
-// spec; publishers encode these with the build tooling. Every file is a
-// plain sequence of records and must parse to exactly EOF; a truncated or
-// trailing byte rejects the whole file. Digests are raw 32-byte sha2-256
-// outputs (the algorithm is declared once in metadata.json, "hash"); every
-// integer is fixed-width little-endian.
+// Binary proof formats — the decode/validate half is the client side; the
+// encode half (encodeShard/encodeMeta) serves the packer and test fixtures.
+// Every file is a plain sequence of records and must parse to exactly EOF; a
+// truncated or trailing byte rejects the whole file. Digests are raw 32-byte
+// sha2-256 outputs (the only hash in the format); every integer is
+// fixed-width little-endian.
 //
 //   shard file := ( u32le(relativeOffset) digest32 )+          fixed 36 B records
 //   meta file  := ( kind:u8 u64le(rangeLength ≥ 1) digest32 )+ fixed 41 B records
@@ -49,9 +49,11 @@ export interface MetaEntry {
   digest: string;
 }
 
-// Filename convention: 16 lowercase hex digits of the absolute start offset.
+// Filename convention: lowercase hex of the absolute start offset, unpadded.
+// Names are computed by the client from verified spans, never parsed, so
+// padding would only serve directory-listing aesthetics.
 export function shardName(startOffset: number): string {
-  return startOffset.toString(16).padStart(16, '0');
+  return startOffset.toString(16);
 }
 
 // Structural check, once per fetched shard (the bytes are already
@@ -179,4 +181,83 @@ function readU64(bytes: Uint8Array, pos: number, label: string): number {
     bytes[pos + 7]! * 0x1000000;
   if (hi >= 0x200000) throw new VerificationError(`${label}: value exceeds 2^53`);
   return lo + hi * 0x100000000;
+}
+
+// ---------------------------------------------------------------------------
+// Encoders — the publisher half of the wire format (pack tool, fixtures).
+// ---------------------------------------------------------------------------
+
+export interface ShardLeafInput {
+  offset: number;
+  digest: Uint8Array;
+}
+
+export interface MetaRecordInput {
+  kind: number;
+  length: number;
+  digest: Uint8Array;
+}
+
+// leaves in file order, absolute offsets; startOffset is the shard's start
+// (its filename).
+export function encodeShard(leaves: ShardLeafInput[], startOffset: number): Uint8Array {
+  if (leaves.length === 0) throw new Error('empty shard');
+  if (leaves.length > MAX_SHARD_RECORDS) {
+    throw new Error(`${leaves.length} records exceed the ${MAX_SHARD_RECORDS}-record limit`);
+  }
+  const out = new Uint8Array(leaves.length * SHARD_RECORD_SIZE);
+  let prev = -1;
+  leaves.forEach(({ offset, digest }, i) => {
+    assertDigest(digest);
+    const rel = offset - startOffset;
+    if (!Number.isSafeInteger(rel) || rel < 0 || rel > 0xffffffff) {
+      throw new Error(`relative offset ${rel} does not fit u32`);
+    }
+    if (i === 0 && rel !== 0) throw new Error('first record must start the shard');
+    if (rel <= prev) throw new Error('offsets not strictly ascending');
+    prev = rel;
+    const pos = i * SHARD_RECORD_SIZE;
+    out[pos] = rel & 0xff;
+    out[pos + 1] = (rel >>> 8) & 0xff;
+    out[pos + 2] = (rel >>> 16) & 0xff;
+    out[pos + 3] = (rel >>> 24) & 0xff;
+    out.set(digest, pos + 4);
+  });
+  return out;
+}
+
+// entries in file order.
+export function encodeMeta(entries: MetaRecordInput[]): Uint8Array {
+  const out = new Uint8Array(entries.length * META_RECORD_SIZE);
+  entries.forEach(({ kind, length, digest }, i) => {
+    if (kind !== KIND_SHARD && kind !== KIND_DIR) throw new Error(`invalid kind ${kind}`);
+    if (!Number.isSafeInteger(length) || length < 1) {
+      throw new Error(`invalid record length ${length}`);
+    }
+    assertDigest(digest);
+    const pos = i * META_RECORD_SIZE;
+    out[pos] = kind;
+    writeU64LE(out, pos + 1, length);
+    out.set(digest, pos + 9);
+  });
+  return out;
+}
+
+function writeU64LE(out: Uint8Array, pos: number, value: number): void {
+  let lo = value % 0x100000000;
+  let hi = Math.floor(value / 0x100000000);
+  for (let i = 0; i < 4; i++) {
+    out[pos + i] = lo & 0xff;
+    lo >>>= 8;
+  }
+  for (let i = 4; i < 8; i++) {
+    out[pos + i] = hi & 0xff;
+    hi >>>= 8;
+  }
+}
+
+function assertDigest(digest: Uint8Array): void {
+  if (!(digest instanceof Uint8Array) || digest.length !== DIGEST_LENGTH) {
+    throw new Error('digest must be 32 bytes');
+  }
 }

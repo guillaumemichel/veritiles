@@ -194,16 +194,6 @@ test('concurrent identical runs share one fetch and one verification pass', asyn
   assert.equal(store.stats.verified, 1);
 });
 
-test('fetchUnverified returns raw bytes and fails over', async () => {
-  const bytes = deterministicBytes(50, 9);
-  const store = new VerifiedStore([
-    source({}, { fail: true }),
-    source({ files: new Map([['metadata.json', bytes]]) }),
-  ]);
-  assert.deepEqual(await store.fetchUnverified('metadata.json', 4096), bytes);
-  assert.equal(store.stats.verified, 0, 'unverified fetches never count as verified');
-});
-
 test('evicts least-recently-used bytes beyond the cache cap', async () => {
   const a = chunk(80, 10);
   const b = chunk(80, 11);
@@ -359,7 +349,7 @@ test('S-05 every source banned still throws, never hangs or empties to success',
   await assert.rejects(store.fetchChecked('x', 'k2', 4096, okCheck(good)), AggregateError);
 });
 
-test('S-06 a banned source is skipped by fetchUnverified and fetchRangeUnverified too', async () => {
+test('S-06 a banned source is skipped by speculative range reads too', async () => {
   const files = new Map([['x', deterministicBytes(100, 37)]]);
   const good = files.get('x')!;
   const buffer = deterministicBytes(200, 38);
@@ -369,7 +359,6 @@ test('S-06 a banned source is skipped by fetchUnverified and fetchRangeUnverifie
   const store = new VerifiedStore([s1, s2]);
   await store.fetchChecked('x', 'k', 4096, okCheck(good)); // bans s1
   log.length = 0;
-  await store.fetchUnverified('x', 4096);
   await store.fetchRangeUnverified('map', 0, 50);
   assert.ok(!log.some((l) => l.startsWith('s1:')), 'banned source skipped in unverified reads');
 });

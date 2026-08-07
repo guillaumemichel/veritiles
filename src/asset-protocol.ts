@@ -1,4 +1,4 @@
-// MapLibre addProtocol handler for `verified://<anchor>/<path>` URLs (A10).
+// MapLibre addProtocol handler for `verified://<anchor>/<path>` URLs (SPEC §10).
 // The URL carries the trust anchor, never the location: a registry maps each
 // anchor to a VerifiedAsset whose content/proof URLs come from page config, so
 // styles stay host-independent. A NotFound glyph range resolves to an empty

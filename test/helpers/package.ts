@@ -1,20 +1,18 @@
-// Miniature map packages assembled with the CANONICAL IPLD implementations
-// (multiformats + @ipld/dag-pb, dev-dependencies): every fixture root CID
-// is computed by the reference stack, so a test that bootstraps one
-// cross-validates the library's zero-dependency CID and dag-pb code against
-// the real thing. The proof-tree shape mirrors the reference publisher
-// build (left-shallow directories, ≤ cap shards).
+// Miniature verified packages: content bytes + meta/shard proof tree +
+// dag-cbor descriptor. The map CID is the raw whole-file content binding.
+// The proof-tree shape mirrors the reference publisher build (left-shallow
+// directories, ≤ cap shards).
 
-import * as dagPb from '@ipld/dag-pb';
 import { CID } from 'multiformats/cid';
 import * as Digest from 'multiformats/hashes/digest';
 
+import { encodeDescriptor } from '../../src/descriptor.ts';
 import { KIND_DIR, KIND_SHARD, SHARD_FILE_CAP, SHARD_RECORD_SIZE, shardName } from '../../src/proof-format.ts';
-import { sha256Bytes, sha256Hex } from './bytes.ts';
-import { encodeMeta, encodeShard } from './proof-encode.ts';
+import { sha256Bytes } from './bytes.ts';
+import { encodeMeta, encodeShard } from '../../src/proof-format.ts';
 
 const SHA2_256 = 0x12;
-const RAW = 0x55;
+const DAG_CBOR = 0x71;
 
 export interface RawLeaf {
   offset: number;
@@ -27,13 +25,16 @@ export interface ProofFile {
   content: Uint8Array;
 }
 
-export interface MapPackage {
-  rootCid: string;
-  files: Map<string, Uint8Array>;
-  leaves: RawLeaf[];
-  metadataBytes: Uint8Array;
-  /** A valid dag-pb CID that is not the root — the classic wrong-anchor. */
+export interface ProofPackage {
+  /** The VerifiedFile anchor: CIDv1(dag-cbor, sha2-256(descriptor)). */
+  anchor: string;
+  /** The map's raw whole-file CID — the descriptor's content binding. */
   mapCid: string;
+  descriptor: Uint8Array;
+  /** Proof-base-relative files: 'root', '{hex}', '{hex}/meta', … */
+  proofs: Map<string, Uint8Array>;
+  mapBytes: Uint8Array;
+  leaves: RawLeaf[];
 }
 
 export interface BuildOptions {
@@ -42,61 +43,26 @@ export interface BuildOptions {
   cuts: number[];
   shardCap?: number;
   metaMaxEntries?: number;
-  /** Extra root entries (beyond map.pmtiles/proofs) folded into the manifest and root node. */
-  extraChildren?: { name: string; tsize: number }[];
 }
 
-export async function buildMapPackage({
+export async function buildProofPackage({
   mapBytes,
   cuts,
   shardCap = SHARD_FILE_CAP,
   metaMaxEntries = 256,
-  extraChildren = [],
-}: BuildOptions): Promise<MapPackage> {
+}: BuildOptions): Promise<ProofPackage> {
   const leaves = leavesFromCuts(mapBytes, cuts);
   const tree = buildProofTree(leaves, { shardCap, maxEntries: metaMaxEntries });
-
-  const mapCid = CID.createV1(dagPb.code, Digest.create(SHA2_256, sha256Bytes(mapBytes)));
-  const proofsCid = CID.createV1(dagPb.code, Digest.create(SHA2_256, sha256Bytes(tree.topMeta)));
-  const children = [
-    { name: 'map.pmtiles', cid: mapCid, tsize: mapBytes.length },
-    { name: 'proofs', cid: proofsCid, tsize: tree.files.reduce((n, f) => n + f.content.length, 0) },
-    ...extraChildren.map((c) => ({
-      name: c.name,
-      cid: CID.createV1(RAW, Digest.create(SHA2_256, sha256Bytes(new TextEncoder().encode(c.name)))),
-      tsize: c.tsize,
-    })),
-  ];
-  const manifest = {
-    formatVersion: 1,
-    hash: 'sha2-256',
-    map: { file: 'map.pmtiles', size: mapBytes.length },
-    proofs: { dir: 'proofs', metaDigest: sha256Hex(tree.topMeta), shardCapBytes: shardCap },
-    children: children.map((c) => ({ name: c.name, cid: c.cid.toString(), tsize: c.tsize })),
-  };
-  const metadataBytes = new TextEncoder().encode(`${JSON.stringify(manifest, null, 2)}\n`);
-  const rootCid = await rootCidFor(children, metadataBytes);
-
-  const files = new Map<string, Uint8Array>([
-    ['map.pmtiles', mapBytes],
-    ['metadata.json', metadataBytes],
-    ...tree.files.map((f) => [`proofs/${f.path}`, f.content] as const),
-  ]);
-  return { rootCid, files, leaves, metadataBytes, mapCid: mapCid.toString() };
-}
-
-// The root directory node, built and hashed by the canonical stack.
-export async function rootCidFor(
-  children: { name: string; cid: CID; tsize: number }[],
-  metadataBytes: Uint8Array,
-): Promise<string> {
-  const selfCid = CID.createV1(RAW, Digest.create(SHA2_256, sha256Bytes(metadataBytes)));
-  const links = [
-    ...children.map((c) => ({ Name: c.name, Hash: c.cid, Tsize: c.tsize })),
-    { Name: 'metadata.json', Hash: selfCid, Tsize: metadataBytes.length },
-  ].sort((a, b) => compareUtf8(a.Name, b.Name));
-  const node = dagPb.encode({ Data: Uint8Array.of(0x08, 0x01), Links: links });
-  return CID.createV1(dagPb.code, Digest.create(SHA2_256, sha256Bytes(node))).toString();
+  const mapCid = CID.createV1(0x55, Digest.create(SHA2_256, sha256Bytes(mapBytes)));
+  const mapCidBytes = mapCid.bytes;
+  const descriptor = encodeDescriptor({ mapCidBytes, topMeta: tree.topMeta, mapSize: mapBytes.length });
+  const anchor = CID.createV1(DAG_CBOR, Digest.create(SHA2_256, sha256Bytes(descriptor))).toString();
+  // The top meta travels inside the descriptor — it is never a hosted file.
+  const proofs = new Map<string, Uint8Array>([['root', descriptor]]);
+  for (const file of tree.files) {
+    if (file.path !== 'meta') proofs.set(file.path, file.content);
+  }
+  return { anchor, mapCid: mapCid.toString(), descriptor, proofs, mapBytes, leaves };
 }
 
 export function leavesFromCuts(mapBytes: Uint8Array, cuts: number[]): RawLeaf[] {
@@ -175,8 +141,4 @@ function emitDir(shards: Shard[], prefix: string, files: ProofFile[], maxEntries
     ...head.map((s) => ({ kind: KIND_SHARD, length: s.length, digest: sha256Bytes(s.content) })),
     ...dirEntries,
   ]);
-}
-
-function compareUtf8(a: string, b: string): number {
-  return Buffer.compare(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'));
 }

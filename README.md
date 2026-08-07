@@ -1,35 +1,44 @@
 # veritiles
 
-Verified map tiles for [PMTiles](https://protomaps.com/): a drop-in
-`Source` that fetches tile byte ranges from **any dumb HTTP host** and
-**cryptographically verifies every byte** against a single
-self-certifying content identifier
-([CID](https://docs.ipfs.tech/concepts/content-addressing/)) before your
-map renders it.
+Verified content for [PMTiles](https://protomaps.com/) and any file: a drop-in
+`Source` that fetches byte ranges from **any dumb HTTP host** and
+**cryptographically verifies every byte** against a single trust anchor (a
+[CID](https://docs.ipfs.tech/concepts/content-addressing/)) before your map
+renders it.
 
-The host is untrusted: a CDN, an S3 bucket, GitHub Pages, an IPFS gateway,
-or `python -m http.server` — anything answering `GET` with single-`Range`
-`206` responses. A malicious or compromised host can withhold tiles
-(visible), but cannot alter one undetected: tampered bytes fail
-verification, are counted, and are never rendered. With more than one
-source configured, a bad host is skipped for the next.
+The host is untrusted: a CDN, an S3 bucket, GitHub Pages, or `npx serve` —
+anything answering `GET` with single-`Range` `206` responses. A malicious or
+compromised host can withhold bytes (visible), but cannot alter one undetected:
+tampered bytes fail verification, are counted, and are never rendered. With
+more than one source configured, a bad host is skipped for the next.
 
-- **Zero dependencies** — ~26 KB minified, including the CID, dag-pb,
-  UnixFS, and CARv1 handling.
+The integrity proof is a small directory of static files: a tiny **descriptor**
+(the anchor's block) plus a tree of digest files. The client downloads only the
+pieces covering what it reads — a tile fetch costs at most a couple of small
+proof files, even for a planet-size archive — and verifies every byte against
+the sha2-256 chain rooted in the anchor (see [`SPEC.md`](./SPEC.md)).
+
+- **Zero dependencies** — ~30 KB minified, including the CID, CBOR,
+  protobuf, and CAR handling. WebCrypto is the only cryptography.
 - **Zero per-tile overhead** — a warm tile read is one exact `Range`
-  request, the same bytes an unverified client would fetch; proofs are
-  ≈ 0.24 % of the archive, fetched lazily for browsed regions only.
+  request, the same bytes an unverified client would fetch.
 - **One round trip for cold tiles** — tile data is fetched speculatively in
   parallel with the proof descent and adopted after its hash checks out.
+- **Scales to planet** — proofs are offset-addressable: constant-size
+  pieces, no upfront download, no index. First paint costs one descriptor
+  (a few KB) plus the covering pieces.
+- **Lazy verification** — opening a file hashes exactly one block (the
+  descriptor, against the anchor); everything else verifies on first use.
 - **Works with every PMTiles renderer** — MapLibre GL, Leaflet (vector and
-  raster), OpenLayers — because it implements the standard `pmtiles`
+  raster), OpenLayers — via the standard `pmtiles`
   [`Source`](https://github.com/protomaps/PMTiles/blob/main/js/src/index.ts)
   interface.
 
 ```js
 const source = new veritiles.VerifiedSource({
-  rootCid: 'bafybei…',                    // the only trust anchor
-  source: 'https://tiles.example/world',  // untrusted base URL(s) of the package
+  cid: "bafyrei…", // the proof descriptor's CID — the only trust anchor
+  source: "https://tiles.example/world.pmtiles", // untrusted URL(s) of the file
+  // proof defaults to `${source}.proofs`
 });
 ```
 
@@ -42,7 +51,7 @@ npm install veritiles
 or from a CDN as a script tag (exposes the `veritiles` global):
 
 ```html
-<script src="https://unpkg.com/veritiles@0.2.0/dist/veritiles.js"></script>
+<script src="https://unpkg.com/veritiles@0.3.0/dist/veritiles.js"></script>
 ```
 
 ## Usage
@@ -50,178 +59,176 @@ or from a CDN as a script tag (exposes the `veritiles` global):
 ### MapLibre GL
 
 ```html
-<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/maplibre-gl@6.2.0/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/pmtiles@4.4.1/dist/pmtiles.js"></script>
-<script src="https://unpkg.com/veritiles@0.2.0/dist/veritiles.js"></script>
+<script src="https://unpkg.com/veritiles@0.3.0/dist/veritiles.js"></script>
 <script>
-  const rootCid = 'bafybeihnila5l5dabqrbpvaictnce5wop364y5kbc7kfowbnd5mbnpayci';
+  const cid = "bafyrei…"; // the proof descriptor's CID — printed by `npm run pack`
   const source = new veritiles.VerifiedSource({
-    rootCid,
-    source: `https://guillaumemichel.github.io/ipfs-pmtiles-demo/ipfs/${rootCid}`,
+    cid,
+    source: "https://tiles.example/world.pmtiles",
   });
 
   const protocol = new pmtiles.Protocol();
-  maplibregl.addProtocol('pmtiles', protocol.tile);
+  maplibregl.addProtocol("pmtiles", protocol.tile);
   protocol.add(new pmtiles.PMTiles(source)); // register BEFORE the style loads
 
   const map = new maplibregl.Map({
-    container: 'map',
+    container: "map",
     style: {
       version: 8,
       sources: {
-        verified: {
-          type: 'vector',
-          url: 'pmtiles://' + rootCid,
-          attribution: '<a href="https://github.com/protomaps/basemaps">Protomaps</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        },
+        verified: { type: "vector", url: "pmtiles://" + cid },
       },
-      layers: [ /* … */ ],
+      layers: [
+        /* … */
+      ],
     },
   });
 </script>
 ```
 
-The style URL is `pmtiles://<rootCid>` — the protocol resolves it to the
+The style URL is `pmtiles://<cid>` — the protocol resolves it to the
 registered instance by key, so nothing is ever fetched from that URL.
 
 ### Leaflet
 
-Vector tiles, via [protomaps-leaflet](https://github.com/protomaps/protomaps-leaflet)
-(its `url` option accepts a `PMTiles` instance):
-
 ```js
-import { PMTiles } from 'pmtiles';
-import { leafletLayer } from 'protomaps-leaflet';
-import { VerifiedSource } from 'veritiles';
+import { PMTiles } from "pmtiles";
+import { leafletLayer } from "protomaps-leaflet";
+import { VerifiedSource } from "veritiles";
 
 const layer = leafletLayer({
-  url: new PMTiles(new VerifiedSource({ rootCid, source: baseUrl })),
-  flavor: 'light',
+  url: new PMTiles(new VerifiedSource({ cid, source: fileUrl })),
+  flavor: "light",
 });
 layer.addTo(map);
 ```
 
-Raster tiles, via the `pmtiles` package's own Leaflet adapter:
-
-```js
-import { PMTiles, leafletRasterLayer } from 'pmtiles';
-
-leafletRasterLayer(
-  new PMTiles(new VerifiedSource({ rootCid, source: baseUrl })),
-  { attribution: '…' },
-).addTo(map);
-```
+Raster tiles use the `pmtiles` package's own adapter
+(`leafletRasterLayer(new PMTiles(new VerifiedSource({ cid, source })))`).
 
 ### OpenLayers
 
-[ol-pmtiles](https://github.com/protomaps/PMTiles/tree/main/openlayers)
-accepts a raw pmtiles `Source` as its `url` option:
-
 ```js
-import { PMTilesVectorSource } from 'ol-pmtiles';
-import { VerifiedSource } from 'veritiles';
+import { PMTilesVectorSource } from "ol-pmtiles";
+import { VerifiedSource } from "veritiles";
 
 const source = new PMTilesVectorSource({
-  url: new VerifiedSource({ rootCid, source: baseUrl }),
+  url: new VerifiedSource({ cid, source: fileUrl }),
 });
 ```
 
 ## API
 
-### `new VerifiedSource(options)`
+### `new VerifiedSource(options)` / `new VerifiedFile(options)`
 
-| option          | type                 | required | description                                                                                                              |
-| --------------- | -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `rootCid`       | `string`             | yes      | Root CID of the map package (CIDv1, base32, dag-pb + sha2-256). The **only** trust input.                                 |
-| `source`        | `string \| string[]` | yes      | Base URL(s) of the package — the directory containing `metadata.json` — tried in order. Relative URLs resolve to the page. |
-| `fetchFn`       | `typeof fetch`       | no       | Replaces global `fetch` — instrumentation/test seam.                                                                      |
-| `maxCacheBytes` | `number`             | no       | Budget for the verified-byte LRU cache (default 64 MiB).                                                                   |
+`VerifiedSource` is the pmtiles adapter; `VerifiedFile` is the same thing
+without the pmtiles `Source` shape (`read(offset, length)` → `Uint8Array`).
+Both take:
 
-Construction is synchronous and validates the CID; the first read performs
-the trust bootstrap (one `metadata.json` fetch, authenticated by
-reconstructing the root CID from it). A failed bootstrap is retried on the
-next read.
+| option          | type                 | required | description                                                                                                                                   |
+| --------------- | -------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cid`           | `string`             | yes      | The anchor CID (CIDv1, base32, sha2-256), codec `dag-cbor` — the proof descriptor.                                                            |
+| `source`        | `string \| string[]` | yes      | URL(s) of the file itself, tried in order. Range + `206` required.                                                                            |
+| `proof`         | `string \| string[]` | no       | Proof base URL(s) — the directory holding `root` and the proof tree. Default `${source}.proofs`. Required explicitly if a source has a query. |
+| `fetchFn`       | `typeof fetch`       | no       | Replaces global `fetch` — instrumentation/test seam.                                                                                          |
+| `maxCacheBytes` | `number`             | no       | Budget for the verified-byte LRU cache (default 64 MiB).                                                                                      |
 
-**Methods** — the pmtiles `Source` contract plus two extras:
+Construction is synchronous and validates the CID; the first read fetches
+`{proof}/root`, hashing it against the anchor — after that, every proof
+file and content slice is verified against the digest its parent
+committed. A failed open is retried on the next read.
+
+**Methods** (`VerifiedSource`, the pmtiles `Source` contract plus extras):
 
 - `getBytes(offset, length, signal?)` → `Promise<{ data: ArrayBuffer }>` —
   verified bytes, clamped at EOF.
-- `getKey()` → the root CID (the `pmtiles://<key>` style key).
-- `ready()` → `Promise<void>` — optional eager bootstrap, to surface a bad
-  CID or unreachable host before the map goes up.
+- `getKey()` → the anchor CID (the `pmtiles://<key>` style key).
+- `ready()` → `Promise<void>` — optional eager open, to surface a bad CID or
+  unreachable host before the map goes up.
 - `stats` → `{ verified, rejected }` — hash checks passed / tampered
   responses caught so far (drive a UI badge from this).
 
-**Errors** — all fail closed; a rejected read surfaces through the map
-library's error event:
-
-- `VerificationError` — bytes did not match the committed digest.
-- `RangeUnsupportedError` — the host answered `200` to a `Range` request
-  (it would stream the whole archive per tile).
-- `RangeBlockedError` — the browser blocked cross-origin `Range` requests
-  (CORS preflight; see below).
+**Errors** — all fail closed: `VerificationError` (bytes did not match the
+committed digest), `RangeUnsupportedError` (the host answered `200` to a
+`Range` request), `RangeBlockedError` (the browser blocked cross-origin
+`Range`; answer `OPTIONS`).
 
 ## Host requirements
 
-| requirement                                     | why                                                                                                     |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `GET <base>/<path>`                             | package contents: `metadata.json`, `map.pmtiles`, `proofs/…`                                             |
-| Single `Range: bytes=a-b` → `206`, exact bytes  | tile reads; identity encoding (no transparent compression of ranged responses)                           |
-| HTTPS or localhost                              | WebCrypto requires a secure context                                                                      |
-| CORS `Access-Control-Allow-Origin: *`           | cross-origin embedding only; Firefox additionally preflights `Range`, so answer `OPTIONS` allowing it    |
+| requirement                                    | why                                                                                                   |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `GET <file>` and `GET <file>.proofs/*`         | the archive and its proof files (plain GETs — **no `Range` needed for proofs**)                       |
+| Single `Range: bytes=a-b` → `206`, exact bytes | tile reads; identity encoding (no transparent compression of ranged responses)                        |
+| HTTPS or localhost                             | WebCrypto requires a secure context                                                                   |
+| CORS `Access-Control-Allow-Origin: *`          | cross-origin embedding only; Firefox additionally preflights `Range`, so answer `OPTIONS` allowing it |
 
-The package can live at **any URL** — a bucket root, a subdirectory, a
-page-relative path. The URL carries **no trust**: verification uses only
-the configured `rootCid`, so a wrong or malicious source merely fails
-verification and the next one is tried.
+The file can live at **any URL**. The URL carries **no trust**: verification
+uses only the configured `cid`, so a wrong or malicious source merely fails
+verification and the next one is tried. Publishing is `cp -r map.pmtiles
+map.pmtiles.proofs <host>`; mirroring is `rsync`.
 
-### IPFS interop (optional)
+### First paint and proof size
 
-The trust anchor is a standard IPFS CID, so the same package is natively
-IPFS-publishable with no extra work: pin it to any node and every
-range-capable gateway becomes a conforming source
-(`source: 'https://dweb.link/ipfs/<rootCid>'`, or a local
-[Kubo](https://github.com/ipfs/kubo) gateway). Publishers who mirror onto
-static hosts under an `/ipfs/<rootCid>/` path keep their URLs recognizable
-to IPFS tooling (e.g. IPFS Companion can redirect them to a local
-gateway), but that layout is a convention, not a requirement.
+Proofs are fetched **incrementally, in constant-size pieces**: the
+descriptor (a few KB, holding the top-level digest map) plus only the
+pieces covering what you read — each ≤ 64 KiB, proving ~1,820 consecutive
+leaves. There is no upfront proof download and no index, at any archive
+size:
+
+| content                      | cold first paint             | steady state        |
+| ---------------------------- | ---------------------------- | ------------------- |
+| 120 MB city, per-tile cuts   | descriptor + 1–2 proof files | 1 `Range` per tile  |
+| 120 GB planet, per-tile cuts | descriptor + 2–3 proof files | 1 `Range` per tile  |
+| 2 GB video, 1 MiB chunks     | descriptor + 1 proof file    | 1 `Range` per chunk |
+
+Proof pieces are immutable and cached by digest forever, so after warm-up
+every tile read is one exact `Range` request with zero overhead. The total
+proof size is ~37 bytes per leaf — but you never fetch all of it.
+
+### IPFS compatibility (optional)
+
+No IPFS anywhere is required — a dumb static host is the normative
+mechanism. If you do use IPFS: the descriptor embeds the archive's UnixFS
+root CID (exactly what `ipfs add --cid-version 1` prints), so any gateway
+or pinning service holding the same file is a valid _content_ source, and
+`veritiles` CIDs inter-operate with standard tooling.
 
 ## Verified assets
 
 Everything else a map needs — a **style**, a **sprite** set, **font
-glyphs**, any directory tree — is a *whole-file* resource rather than a
+glyphs**, any directory tree — is a _whole-file_ resource rather than a
 range read. `VerifiedAsset` fetches these from dumb HTTP hosts and verifies
-them against a single **anchor CID**, exactly as `VerifiedSource` does for
-tiles. The anchor's codec says what it names (see
-[`SPEC.md`](./SPEC.md), Part 2):
+them against the content's own root CID, exactly as `VerifiedSource` does
+for tiles. The anchor's codec says what it names:
 
 - **raw anchor** (`bafkrei…`) — a single file ≤ 256 KiB (a typical
   `style.json`). The content is self-verifying; no proof exists.
-- **car anchor** (`bagbaiera…`) — a UnixFS file or directory of any size.
-  The anchor names a **proof file** (a strict CARv1 of the DAG's internal
-  nodes) whose verified root the client walks. Proof and content are
-  independently hostable.
+- **dag-pb anchor** (`bafybei…`) — a UnixFS file or directory of any size.
+  The proof CAR carries the DAG's internal nodes, verified lazily against
+  the anchor. Proof and content are independently hostable.
 
 ```js
-import { VerifiedAsset, assetProtocol } from 'veritiles';
+import { VerifiedAsset, assetProtocol } from "veritiles";
 
 // A directory of glyphs; the proof defaults to `<base>.car`.
-const fonts = new VerifiedAsset({ cid: FONTS_ANCHOR, source: fontsBase });
+const fonts = new VerifiedAsset({ cid: FONTS_CID, source: fontsBase });
 
 // A sprite whose proof is hosted somewhere else entirely.
 const sprite = new VerifiedAsset({
-  cid: SPRITE_ANCHOR,
-  source: spriteBase,                       // dumb mirror: content only
-  proof: 'https://cdn.example/sprite.car',  // proof hosted elsewhere
+  cid: SPRITE_CID,
+  source: spriteBase, // dumb mirror: content only
+  proof: "https://cdn.example/sprite.car", // proof hosted elsewhere
 });
 
-maplibregl.addProtocol('verified', assetProtocol([fonts, sprite]));
+maplibregl.addProtocol("verified", assetProtocol([fonts, sprite]));
 
 // A raw style artifact — its own bytes are the trust input.
-const style = new VerifiedAsset({ cid: STYLE_ANCHOR, source: styleUrl });
+const style = new VerifiedAsset({ cid: STYLE_CID, source: styleUrl });
 const map = new maplibregl.Map({
-  container: 'map',
-  style: JSON.parse(new TextDecoder().decode(await style.bytes(''))),
+  container: "map",
+  style: JSON.parse(new TextDecoder().decode(await style.bytes(""))),
 });
 ```
 
@@ -229,79 +236,63 @@ with, inside the verified `style.json`:
 
 ```json
 {
-  "glyphs": "verified://<fonts anchor>/{fontstack}/{range}.pbf",
-  "sprite": "verified://<sprite anchor>/sprite"
+  "glyphs": "verified://<fonts CID>/{fontstack}/{range}.pbf",
+  "sprite": "verified://<sprite CID>/sprite"
 }
 ```
 
-A `verified://<anchor>/<path>` URL carries the **trust anchor, never the
+A `verified://<cid>/<path>` URL carries the **trust anchor, never the
 location**: the registry maps the anchor to a client instance whose URLs
 come from page configuration, so styles stay host-independent and are
 themselves pinnable artifacts.
 
-### `new VerifiedAsset(options)`
+`VerifiedAsset` options mirror `VerifiedFile` (`cid`, `source`, `proof`,
+`fetchFn`, `maxCacheBytes`, `maxProofBytes`, `maxFileBytes`,
+`checkProofCompleteness`). `bytes(path?,
+{ signal? })` returns the file at `path` (`''`, the default, is the artifact
+itself), a fresh copy each call. `NotFoundError` is an **authenticated
+absence** — the artifact provably lacks that path (distinct from a host's
+HTTP 404); the `assetProtocol` adapter turns a `NotFound` glyph range into
+an empty response and surfaces every other error. Asset hosts need only
+HTTPS and `Access-Control-Allow-Origin: *` — reads are whole-file `GET`s, so
+**no `Range` support is required**.
 
-| option          | type                 | required | description                                                                                        |
-| --------------- | -------------------- | -------- | -------------------------------------------------------------------------------------------------- |
-| `cid`           | `string`             | yes      | Anchor CID (CIDv1, base32, sha2-256): codec `raw` (the content) or `car` (a proof file).            |
-| `source`        | `string \| string[]` | yes      | Content base URL(s), tried in order.                                                                |
-| `proof`         | `string \| string[]` | no       | Proof URL(s), tried in order. Default `<base>.car` per content base. Only valid for a car anchor.    |
-| `fetchFn`       | `typeof fetch`       | no       | Replaces global `fetch` — instrumentation/test seam.                                                |
-| `maxCacheBytes` | `number`             | no       | Budget for the verified-byte LRU cache (default 64 MiB).                                             |
-| `maxFileBytes`  | `number`             | no       | Per-file bound for DAG files (default 64 MiB).                                                       |
+## Creating verified content
 
-- `bytes(path?, { signal? })` → `Promise<Uint8Array>` — the file at `path`
-  (`''`, the default, is the artifact itself); a fresh copy each call.
-- `cid` → the anchor; `root` → the verified artifact root CID for
-  diagnostics; `stats` → `{ verified, rejected }`.
-- `NotFoundError` — an **authenticated absence**: the artifact provably does
-  not contain that path (distinct from a host's HTTP 404). The
-  `assetProtocol` adapter turns a `NotFound` glyph range into an empty
-  response (MapLibre tolerates sparse ranges); every other error surfaces.
+```sh
+npm run pack -- map.pmtiles
+# → writes map.pmtiles.proofs/  (descriptor + proof tree)
+# → prints the anchor CID (bafyrei…) to stdout
+```
 
-Asset hosts need only **HTTPS** and `Access-Control-Allow-Origin: *`. Reads
-are whole-file `GET`s, so — unlike tiles — **no `Range` support is
-required** and every request is a CORS simple request (no preflight).
-
-Because the proof is itself a content-addressed IPFS block, a **proof URL
-can point at any trustless gateway** with zero client code — recode the
-anchor to the `raw` codec and request
-`{gateway}/ipfs/{anchor-as-raw}?format=raw`. This v1 does not implement the
-optional gateway *content* sources (A5.1) or cross-session proof
-persistence; both are compatible additions.
-
-## Creating verified map packages
-
-A package is a plain directory — `map.pmtiles`, `metadata.json`, and a
-`proofs/` tree — identified by one root CID, published by copying it
-anywhere on any static host and/or pinning it to IPFS.
-
-Packaging tooling is not part of this library yet. The package format and
-client protocol are specified in [`SPEC.md`](./SPEC.md) (Part 1 — map
-packages; Part 2 — verified assets), so the formats are defined where
-their client lives. The reference build pipeline (PMTiles archive in,
-package + proofs out) lives in the
+Upload `map.pmtiles` and `map.pmtiles.proofs/` to any static host and
+configure clients with the printed anchor. The packer cuts chunk
+boundaries at the ranges a pmtiles reader actually requests — one leaf per
+tile or tile group, zero over-fetch — and shapes the proof tree by zoom
+level, so low zooms stay shallow and the descriptor stays tiny at any
+scale. The generator profiles are documented in [`SPEC.md`](./SPEC.md) §8;
+`--profile fixed` packs non-PMTiles files. The reference application
+(PMTiles archive → verified map) lives in the
 [ipfs-pmtiles-demo](https://github.com/guillaumemichel/ipfs-pmtiles-demo)
 repository, alongside a
 [live demo](https://guillaumemichel.github.io/ipfs-pmtiles-demo/) of this
-verification client (try `?tamper=1`). Future work is a packaging CLI in
-this repository.
+verification client (try `?tamper=1`).
 
 ## Development
 
 ```sh
 npm ci
-npm test           # unit + differential tests, golden fixtures from a real
-                   # package, end-to-end through the real pmtiles reader
+npm test           # unit + differential tests, kubo-verified golden anchors,
+                   # end-to-end through the real pmtiles reader
 npm run typecheck
-npm run build      # dist/: ESM bundle, minified IIFE, .d.ts
+npm run build      # dist/: ESM bundle, minified IIFE (~30 KB), .d.ts
 ```
 
 The library is zero-dependency by design; the canonical IPLD
 implementations (`multiformats`, `@ipld/dag-pb`, `@ipld/car`,
 `ipfs-unixfs`, `ipfs-unixfs-importer`, `blockstore-core`) and `pmtiles`
 appear only as dev-dependencies, cross-validating the hand-rolled
-CID / dag-pb / UnixFS / CARv1 handling byte-for-byte in the test suite.
+CID / dag-pb / UnixFS / CAR handling byte-for-byte in the test suite.
 
 ## License
 

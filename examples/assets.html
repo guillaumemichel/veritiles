@@ -4,12 +4,12 @@
     <meta charset="utf-8">
     <title>veritiles + verified assets (style + glyphs)</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
-    <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-    <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+    <script src="https://unpkg.com/maplibre-gl@6.2.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@6.2.0/dist/maplibre-gl.css" rel="stylesheet">
     <script src="https://unpkg.com/pmtiles@4.4.1/dist/pmtiles.js"></script>
     <!-- For local development against this checkout, run `npm run build`
          and swap in ../dist/veritiles.js -->
-    <script src="https://unpkg.com/veritiles@0.2.0/dist/veritiles.js"></script>
+    <script src="https://unpkg.com/veritiles@0.3.0/dist/veritiles.js"></script>
     <style>
         body { margin: 0; }
         #map { position: absolute; inset: 0; }
@@ -25,13 +25,13 @@
     <div id="map"></div>
     <div id="badge">loading…</div>
     <!-- Everything this page renders is hash-verified before use: tiles
-         against MAP_ROOT (range reads), the style against STYLE_CID (a raw
-         artifact — its own bytes are the trust input), and every glyph range
-         against FONTS_ANCHOR (a DAG artifact: ./assets/fonts mirrors the
-         directory, ./assets/fonts.car is its proof; the two could live on
-         different hosts). The style and glyphs are fixture files in this
-         repo, so serve the checkout over HTTP (WebCrypto needs a secure
-         context; localhost qualifies):
+         against MAP_ANCHOR (range reads over the shard-tree proof), the style
+         against STYLE_CID (a raw artifact — its own bytes are the trust
+         input), and every glyph range against FONTS_ANCHOR (a DAG artifact:
+         ./assets/fonts mirrors the directory, ./assets/fonts.car is its
+         proof; the two could live on different hosts). The style and glyphs
+         are fixture files in this repo, so serve the checkout over HTTP
+         (WebCrypto needs a secure context; localhost qualifies):
 
              npx serve            # or: python3 -m http.server
              http://localhost:3000/examples/assets.html
@@ -41,16 +41,20 @@
          anchors below drift. Only glyph ranges 0-511 ship with the example;
          a range it lacks is an authenticated absence and renders empty. -->
     <script type="module">
-        const MAP_ROOT = 'bafybeihnila5l5dabqrbpvaictnce5wop364y5kbc7kfowbnd5mbnpayci';
-        const STYLE_CID = 'bafkreic5q32hdgp3yrzer6vvjlk4rzap4yn7btrqw3y7ydbl7h3rhqwh4y';
-        const FONTS_ANCHOR = 'bagbaiera5mqjy7zo4yquou3t76ykbrjw3irwxq6l3hxrtivkfgy4a7q5t6pa';
+        // NOTE: MAP_ANCHOR predates veritiles 0.3.0's proof format — the
+        // hosted demo map is the retired layout. Republish the map with
+        // `npm run pack -- map.pmtiles` and paste the anchor + URL here.
+        const MAP_ANCHOR = 'bafyrei…';
+        const MAP_URL = 'https://tiles.example/map.pmtiles';
+        const STYLE_CID = 'bafkreihinewiz4nedsh6k26zibqhu3mlrwv44so3jbcdvb2pm7oqzm5ecq';
+        const FONTS_ANCHOR = 'bafybeibea5wyp7qouq2sn4naonhwqr6iupjdlbpos6wge2w5ixnwgmu4fm';
 
         const badge = document.getElementById('badge');
         try {
             // Tiles: verified range reads over the published map package.
             const tiles = new veritiles.VerifiedSource({
-                rootCid: MAP_ROOT,
-                source: `https://guillaumemichel.github.io/ipfs-pmtiles-demo/ipfs/${MAP_ROOT}`,
+                cid: MAP_ANCHOR,
+                source: MAP_URL, // proofs default to MAP_URL + '.proofs'
             });
             const protocol = new pmtiles.Protocol();
             maplibregl.addProtocol('pmtiles', protocol.tile);
@@ -66,7 +70,7 @@
             maplibregl.addProtocol('verified', veritiles.assetProtocol([fonts]));
 
             // Style: a raw artifact — fetched, hashed against STYLE_CID, then
-            // handed to MapLibre. It references pmtiles://MAP_ROOT and
+            // handed to MapLibre. It references pmtiles://MAP_ANCHOR and
             // verified://FONTS_ANCHOR/…, so the page is host-independent.
             const styleAsset = new veritiles.VerifiedAsset({
                 cid: STYLE_CID,

@@ -17,9 +17,11 @@ import { fileURLToPath } from 'node:url';
 import { NotFoundError, VerifiedAsset } from '../src/index.ts';
 import { buildArtifact, serveArtifact, type TreeEntry } from '../test/helpers/artifact.ts';
 
-// The published demo map package the other examples already render; the
-// style's vector source points at it by CID.
-const MAP_ROOT = 'bafybeihnila5l5dabqrbpvaictnce5wop364y5kbc7kfowbnd5mbnpayci';
+// The published demo map the other examples render; the style's vector
+// source points at it by anchor. NOTE: predates 0.3.0's proof format —
+// replace with the anchor printed by `npm run pack` when the demo map is
+// republished.
+const MAP_ANCHOR = 'bafyrei…';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const assetsDir = join(here, 'assets');
@@ -41,7 +43,7 @@ const style = {
   sources: {
     'pmtiles-source': {
       type: 'vector',
-      url: `pmtiles://${MAP_ROOT}`,
+      url: `pmtiles://${MAP_ANCHOR}`,
       attribution:
         '<a href="https://github.com/protomaps/basemaps">Protomaps</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     },
@@ -128,11 +130,11 @@ assert.equal(tamperedAsset.stats.rejected, 1, 'a tampered glyph must count one r
 
 // ---- drift guard against assets.html ----------------------------------------
 
-const expected = { STYLE_CID: styleArtifact.anchor, FONTS_ANCHOR: fonts.anchor, MAP_ROOT };
+const expected = { STYLE_CID: styleArtifact.anchor, FONTS_ANCHOR: fonts.anchor, MAP_ANCHOR };
 console.log('fixture written to examples/assets/:');
 console.log(`  style.json  ${styleBytes.length} B   STYLE_CID    ${expected.STYLE_CID}`);
 console.log(`  fonts.car   ${fonts.proof.length} B   FONTS_ANCHOR ${expected.FONTS_ANCHOR}`);
-console.log(`  map (remote package)       MAP_ROOT     ${expected.MAP_ROOT}`);
+console.log(`  map (remote package)       MAP_ANCHOR   ${expected.MAP_ANCHOR}`);
 
 const html = await readFile(htmlPath, 'utf8').catch(() => undefined);
 if (html === undefined) {

@@ -1,6 +1,6 @@
 {
   "name": "veritiles",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Verified map tiles: a pmtiles-compatible Source that fetches PMTiles byte ranges from any dumb HTTP host and cryptographically verifies every byte against a content-addressed trust anchor (CID) before your map renders it.",
   "type": "module",
   "license": "MIT",
@@ -47,6 +47,7 @@
   },
   "scripts": {
     "test": "node --test 'test/*.test.ts'",
+    "pack": "node tools/pack.ts",
     "typecheck": "tsc -p tsconfig.json",
     "build": "npm run build:types && npm run build:esm && npm run build:iife",
     "build:types": "tsc -p tsconfig.build.json",
@@ -56,6 +57,7 @@
   },
   "devDependencies": {
     "@ipld/car": "^5.4.6",
+    "@ipld/dag-cbor": "^10.0.2",
     "@ipld/dag-pb": "^4.1.7",
     "@types/node": "^26.1.1",
     "blockstore-core": "^7.0.1",

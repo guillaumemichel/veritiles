@@ -51,8 +51,8 @@ test('M-04 NotFound on a non-.pbf path rethrows', async () => {
   await assert.rejects(protocol({ url: `verified://${fonts.cid}/missing.json` }), NotFoundError);
 });
 
-test('M-05 a verification failure on a .pbf path propagates', async () => {
-  const { fonts, protocol } = await setup({ tamper: (u, b) => (u.endsWith('.car') ? undefined : new Uint8Array(b.map((x) => x ^ 0xff))) });
+test('M-05 a proof verification failure on a .pbf path propagates', async () => {
+  const { fonts, protocol } = await setup({ tamper: (u, b) => (u.endsWith('.car') ? new Uint8Array(b.map((x) => x ^ 0xff)) : undefined) });
   await assert.rejects(
     protocol({ url: `verified://${fonts.cid}/${GLYPH_URL_SEG}` }),
     (err: unknown) => err instanceof AggregateError && err.errors.some((e) => e instanceof VerificationError),

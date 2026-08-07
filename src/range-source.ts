@@ -1,7 +1,7 @@
 // Byte source for one base URL of a published package — a dumb static host
 // or an /ipfs/<rootCID>/ path on any range-capable HTTP gateway; the client
 // cannot tell the difference. Two request shapes only: a plain GET for
-// whole small files (metadata.json, proofs — CORS simple requests in every
+// whole small files (assets and proofs — CORS simple requests in every
 // browser) and a single-`Range` GET for map byte runs. Returns UNVERIFIED
 // bytes; the VerifiedStore above is the one verification choke point.
 
@@ -16,7 +16,7 @@ export class RangeUnsupportedError extends Error {
 }
 
 // A ranged GET rejected with a network TypeError even though a plain GET to
-// the same base already succeeded (metadata.json always has by then) — the
+// same base already succeeded (a plain GET has succeeded) — the
 // signature of a CORS preflight the host cannot answer (Firefox + a host
 // that cannot allow `Range`).
 export class RangeBlockedError extends Error {
@@ -33,7 +33,7 @@ export class RangeSource {
     this.#fetchFn = fetchFn ?? ((...args: Parameters<FetchFn>) => fetch(...args));
   }
 
-  // Whole file by decoded UnixFS path; body read with a hard cap.
+  // Whole file by a validated bundle path; body read with a hard cap.
   async fetchWhole(path: string, cap: number, { signal }: { signal?: AbortSignal } = {}): Promise<Uint8Array> {
     const res = await this.#request(this.#url(path), { signal }, true);
     const body = await readBody(res, cap);
@@ -54,7 +54,7 @@ export class RangeSource {
     return readBody(res, length);
   }
 
-  // A file artifact's bytes live at `{base}` itself (A3); a member lives at
+  // A file artifact's bytes live at `{base}` itself (SPEC §5.4); a member lives at
   // `{base}/{path}`. The empty path must not append a trailing slash. The map
   // path never fetches '', so it is unaffected.
   #url(path: string): string {

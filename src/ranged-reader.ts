@@ -1,17 +1,32 @@
-// Verified reads over the map archive. Warm path: the proof descent is
-// answered synchronously from cached shards, cache hits are copied, and the
-// rest is fetched in maximal file-contiguous runs, one Range request each.
-// Cold path: the exact requested range is fetched SPECULATIVELY in parallel
-// with the proof descent — tile reads are leaf-aligned by construction, so
-// the body is almost always adoptable as-is once digests arrive, collapsing
-// a region's first tile from two round trips to one. A misaligned or
-// tampered speculative body is discarded and the ordinary verified run
+// Verified reads over one file, given a LeafIndex that maps byte ranges to the
+// leaves covering them. Warm path: the leaf lookup is answered synchronously
+// from cached nodes, cache hits are copied, and the rest is fetched in maximal
+// file-contiguous runs, one Range request each. Cold path: the exact requested
+// range is fetched SPECULATIVELY in parallel with the (async) leaf lookup —
+// leaf-aligned reads adopt the speculative body as-is once digests arrive,
+// collapsing a region's first read from two round trips to one. A misaligned
+// or tampered speculative body is discarded and the ordinary verified run
 // fetch takes over; integrity never depends on the speculation.
+//
+// This is the content-agnostic read loop: it knows nothing about PMTiles, the
+// proof format, or the DAG — only the LeafIndex seam and the VerifiedStore.
 
-import type { Leaf } from './proof-format.ts';
-import type { ProofIndex } from './proof-index.ts';
 import type { VerifiedStore } from './verified-store.ts';
 import { VerificationError } from './verify.ts';
+
+// A verified byte range of the file and the digest its bytes must hash to.
+export interface Leaf {
+  offset: number;
+  length: number;
+  digest: string;
+}
+
+// The seam the read loop depends on: covering leaves for a byte range, async
+// (may fetch/verify proof structure) or synchronous (cached only, else null).
+export interface LeafIndex {
+  leavesFor(start: number, end: number, opts?: { signal?: AbortSignal }): Promise<Leaf[]>;
+  cachedLeavesFor(start: number, end: number): Leaf[] | null;
+}
 
 interface Run {
   leaves: Leaf[];
@@ -23,13 +38,13 @@ interface Speculation {
   cancel: () => void;
 }
 
-export class MapFile {
+export class RangedReader {
   #store: VerifiedStore;
-  #proofs: ProofIndex;
+  #proofs: LeafIndex;
   #path: string;
   #size: number;
 
-  constructor(store: VerifiedStore, proofs: ProofIndex, path: string, size: number) {
+  constructor(store: VerifiedStore, proofs: LeafIndex, path: string, size: number) {
     this.#store = store;
     this.#proofs = proofs;
     this.#path = path;
@@ -77,7 +92,7 @@ export class MapFile {
     }
 
     // A run is adoptable when it lies entirely inside the speculative body
-    // — for leaf-aligned tile reads that is the whole (single) run.
+    // — for leaf-aligned reads that is the whole (single) run.
     const adoptable = (r: Run) => spec !== null && r.leaves[0]!.offset >= offset && r.end <= end;
     if (spec !== null && !runs.some(adoptable)) spec.cancel();
 

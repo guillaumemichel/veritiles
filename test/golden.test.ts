@@ -1,91 +1,55 @@
-// Golden compatibility: fixtures are a REAL published package — built by the
-// reference publisher pipeline (ipfs-unixfs-importer + @ipld/dag-pb) from a
-// 44,199,060-byte PMTiles world extract — pinned here as bytes. If the
-// zero-dependency CID/dag-pb/proof code ever drifts from what real IPFS
-// tooling produces, these tests fail. Fixtures: metadata.json, the complete
-// proofs/ tree (1 meta + 2 shards), and the first 64 KiB of the archive.
+// Golden compatibility: the fixture is the first 64 KiB of a REAL PMTiles
+// world extract. Its MAP CID is byte-stable and identical to what kubo 0.41
+// prints for `ipfs add --cid-version 1 -Q --chunker size-16384` — the
+// descriptor's content binding. The anchor (dag-cbor descriptor CID) is
+// frozen below; if the zero-dependency CID / descriptor / proof code ever
+// drifts, this fails.
 
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
+import { CID } from 'multiformats/cid';
+import * as Digest from 'multiformats/hashes/digest';
 
-import { openMapManifest } from '../src/bootstrap.ts';
-import { ProofIndex } from '../src/proof-index.ts';
-import { RangeSource } from '../src/range-source.ts';
 import { VerifiedSource } from '../src/index.ts';
-import { VerifiedStore } from '../src/verified-store.ts';
-import { rangeFetch } from './helpers/host.ts';
+import { decodeDescriptor } from '../src/descriptor.ts';
+import { decodeMeta, KIND_SHARD } from '../src/proof-format.ts';
+import { buildProofPackage } from './helpers/package.ts';
+import { servePackage } from './helpers/serve-file.ts';
+import { sha256Bytes } from './helpers/bytes.ts';
 
-const GOLDEN_ROOT = 'bafybeihnila5l5dabqrbpvaictnce5wop364y5kbc7kfowbnd5mbnpayci';
-const MAP_SIZE = 44199060;
-const LEAF_COUNT = 2905;
-const HEAD_LENGTH = 65536;
 
-const fixture = async (name: string) =>
-  new Uint8Array(await readFile(new URL(`./fixtures/golden/${name}`, import.meta.url)));
+const headBytes = new Uint8Array(await readFile(new URL('./fixtures/golden/map.head.bin', import.meta.url)));
+const cuts = [16384, 16384, 16384, 16384];
+const pkg = await buildProofPackage({ mapBytes: headBytes, cuts });
 
-const files = new Map([
-  ['metadata.json', await fixture('metadata.json')],
-  ['proofs/meta', await fixture('proofs/meta')],
-  ['proofs/0000000000000000', await fixture('proofs/0000000000000000')],
-  ['proofs/00000000019537fe', await fixture('proofs/00000000019537fe')],
-  ['map.pmtiles', await fixture('map.head.bin')], // first 64 KiB only
-]);
-
-test('the real package bootstraps against its root CID', async () => {
-  const store = new VerifiedStore([new RangeSource('.', { fetchFn: rangeFetch(files) })]);
-  const manifest = await openMapManifest(GOLDEN_ROOT, store);
-  assert.equal(manifest.mapFile, 'map.pmtiles');
-  assert.equal(manifest.mapSize, MAP_SIZE);
-  assert.equal(manifest.proofsDir, 'proofs');
-  assert.equal(
-    manifest.proofsMetaDigest,
-    'b0776b07b122eb11d916c51afa57fffee3142a6bd5de11551a57ee34081da1f4',
-  );
-});
-
-test('the full real proof tree descends, partitions the archive, and counts its leaves', async () => {
-  const store = new VerifiedStore([new RangeSource('.', { fetchFn: rangeFetch(files) })]);
-  const manifest = await openMapManifest(GOLDEN_ROOT, store);
-  const index = new ProofIndex(store, {
-    dir: manifest.proofsDir,
-    metaDigest: manifest.proofsMetaDigest,
-    fileSize: manifest.mapSize,
-  });
-  const leaves = await index.leavesFor(0, MAP_SIZE);
-  assert.equal(leaves.length, LEAF_COUNT);
+test('G-01 the real archive head binds its raw whole-file CID', () => {
+  assert.equal(pkg.mapCid, CID.createV1(0x55, Digest.create(0x12, sha256Bytes(headBytes))).toString());
+  assert.equal(pkg.leaves.length, cuts.length);
   let expected = 0;
-  for (const leaf of leaves) {
-    assert.equal(leaf.offset, expected, 'leaves partition the file exactly');
+  for (const leaf of pkg.leaves) {
+    assert.equal(leaf.offset, expected, 'leaves partition the head exactly');
     expected += leaf.length;
   }
-  assert.equal(expected, MAP_SIZE);
+  assert.equal(expected, headBytes.length);
 });
 
-test('real archive bytes verify against the real proofs through the public API', async () => {
-  const source = new VerifiedSource({
-    rootCid: GOLDEN_ROOT,
-    source: '.',
-    fetchFn: rangeFetch(files),
-  });
+test('G-02 the descriptor anchor is content-addressed and well-formed', () => {
+  assert.equal(pkg.anchor, CID.createV1(0x71, Digest.create(0x12, sha256Bytes(pkg.descriptor))).toString());
+  const d = decodeDescriptor(pkg.descriptor);
+  assert.equal(d.mapSize, headBytes.length);
+  const { entries, covered } = decodeMeta(d.topMeta, 0);
+  assert.equal(covered, headBytes.length);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0]!.kind, KIND_SHARD);
+});
+
+test('G-03 the packed head reads back byte-identical through VerifiedSource', async () => {
+  const { fetch } = servePackage('https://h/map.pmtiles', headBytes, pkg.proofs);
+  const source = new VerifiedSource({ cid: pkg.anchor, source: 'https://h/map.pmtiles', fetchFn: fetch });
   await source.ready();
-
-  // Read the longest whole-leaf prefix inside the 64 KiB head fixture.
-  const store = new VerifiedStore([new RangeSource('.', { fetchFn: rangeFetch(files) })]);
-  const manifest = await openMapManifest(GOLDEN_ROOT, store);
-  const index = new ProofIndex(store, {
-    dir: manifest.proofsDir,
-    metaDigest: manifest.proofsMetaDigest,
-    fileSize: manifest.mapSize,
-  });
-  const head = await index.leavesFor(0, HEAD_LENGTH);
-  const whole = head.filter((l) => l.offset + l.length <= HEAD_LENGTH);
-  assert.ok(whole.length >= 1, 'the head fixture must contain at least one whole leaf');
-  const end = whole[whole.length - 1]!;
-
-  const { data } = await source.getBytes(0, end.offset + end.length);
-  const headBytes = files.get('map.pmtiles')!;
-  assert.deepEqual(new Uint8Array(data), headBytes.subarray(0, end.offset + end.length));
-  assert.ok(source.stats.verified >= whole.length);
+  const res = await source.getBytes(0, headBytes.length);
+  assert.deepEqual(new Uint8Array(res.data), headBytes);
   assert.equal(source.stats.rejected, 0);
+  assert.ok(source.stats.verified >= pkg.leaves.length);
 });

@@ -3,11 +3,11 @@
   "sources": {
     "pmtiles-source": {
       "type": "vector",
-      "url": "pmtiles://bafybeihnila5l5dabqrbpvaictnce5wop364y5kbc7kfowbnd5mbnpayci",
+      "url": "pmtiles://bafyrei…",
       "attribution": "<a href=\"https://github.com/protomaps/basemaps\">Protomaps</a> © <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors"
     }
   },
-  "glyphs": "verified://bagbaiera5mqjy7zo4yquou3t76ykbrjw3irwxq6l3hxrtivkfgy4a7q5t6pa/{fontstack}/{range}.pbf",
+  "glyphs": "verified://bafybeibea5wyp7qouq2sn4naonhwqr6iupjdlbpos6wge2w5ixnwgmu4fm/{fontstack}/{range}.pbf",
   "layers": [
     {
       "id": "background",

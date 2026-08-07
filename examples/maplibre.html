@@ -4,12 +4,12 @@
     <meta charset="utf-8">
     <title>veritiles + MapLibre GL</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
-    <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-    <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+    <script src="https://unpkg.com/maplibre-gl@6.2.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@6.2.0/dist/maplibre-gl.css" rel="stylesheet">
     <script src="https://unpkg.com/pmtiles@4.4.1/dist/pmtiles.js"></script>
     <!-- For local development against this checkout, run `npm run build`
          and swap in ../dist/veritiles.js -->
-    <script src="https://unpkg.com/veritiles@0.2.0/dist/veritiles.js"></script>
+    <script src="https://unpkg.com/veritiles@0.3.0/dist/veritiles.js"></script>
     <style>
         body { margin: 0; }
         #map { position: absolute; inset: 0; }
@@ -25,13 +25,16 @@
     <div id="map"></div>
     <div id="badge">loading…</div>
     <script>
-        // The root CID is the only trust anchor; the base URL below is an
-        // untrusted directory serving the package files and could be swapped
-        // for any mirror or IPFS gateway path holding the same content.
-        const rootCid = 'bafybeihnila5l5dabqrbpvaictnce5wop364y5kbc7kfowbnd5mbnpayci';
+        // The anchor CID is the only trust input; the source URL is
+        // untrusted and could be any mirror serving the same bytes.
+        // NOTE: the hosted demo package predates veritiles 0.3.0's proof
+        // format. Republish the map with `npm run pack -- map.pmtiles`,
+        // upload map.pmtiles + map.pmtiles.proofs/, and paste the anchor
+        // and URL here.
+        const cid = 'bafyrei…'; // anchor printed by `npm run pack`
         const source = new veritiles.VerifiedSource({
-            rootCid,
-            source: `https://guillaumemichel.github.io/ipfs-pmtiles-demo/ipfs/${rootCid}`,
+            cid,
+            source: 'https://tiles.example/map.pmtiles', // proofs: + '.proofs'
         });
 
         const protocol = new pmtiles.Protocol();
@@ -47,7 +50,7 @@
                 sources: {
                     verified: {
                         type: 'vector',
-                        url: 'pmtiles://' + rootCid,
+                        url: 'pmtiles://' + cid,
                         attribution: '<a href="https://github.com/protomaps/basemaps">Protomaps</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
                     },
                 },

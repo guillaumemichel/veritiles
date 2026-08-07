@@ -1,7 +1,7 @@
 // In-memory "dumb host": plain GET + single Range, nothing else — the whole
-// host contract the library targets. `files` maps package-relative paths
-// (e.g. 'map.pmtiles', 'proofs/meta') to bytes; the /ipfs/<rootCid>/ prefix
-// a VerifiedSource composes into its URLs is stripped before lookup.
+// host contract the library targets. `files` maps host-relative paths
+// (e.g. 'root', '3f2a…', '3f2a…/meta') to bytes; any /ipfs/<cid>/ prefix in
+// the URL is stripped before lookup.
 // tamper(path, range, bytes) may replace a response body — `range` is null
 // for a plain GET, so a test can corrupt only ranged (tile) responses.
 

@@ -11,7 +11,7 @@ on:
 
 permissions:
   id-token: write # OIDC for trusted publishing + provenance
-  contents: read
+  contents: write
 
 jobs:
   publish:
@@ -33,3 +33,7 @@ jobs:
           fi
       # prepublishOnly runs typecheck + tests + build.
       - run: npm publish
+      - name: Create draft GitHub Release
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes --draft
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -13,13 +13,13 @@ import {
 } from '../src/proof-format.ts';
 import { toHex, VerificationError } from '../src/verify.ts';
 import { deterministicBytes } from './helpers/bytes.ts';
-import { encodeMeta, encodeShard } from './helpers/proof-encode.ts';
+import { encodeMeta, encodeShard } from '../src/proof-format.ts';
 
 const digest = (seed: number) => deterministicBytes(32, seed);
 
-test('shardName is 16 zero-padded lowercase hex digits', () => {
-  assert.equal(shardName(0), '0000000000000000');
-  assert.equal(shardName(0xa3f0c0), '0000000000a3f0c0');
+test('shardName is unpadded lowercase hex of the absolute start offset', () => {
+  assert.equal(shardName(0), '0');
+  assert.equal(shardName(0xa3f0c0), 'a3f0c0');
 });
 
 test('shard records round-trip: fixed 36 B records, offsets relative to the filename', () => {
