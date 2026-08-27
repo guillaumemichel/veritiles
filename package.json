@@ -46,7 +46,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test 'test/*.test.ts'",
+    "test": "node --test 'test/*.test.ts' && node examples/build-assets.ts",
     "pack": "node tools/pack.ts",
     "typecheck": "tsc -p tsconfig.json",
     "build": "npm run build:types && npm run build:esm && npm run build:iife",

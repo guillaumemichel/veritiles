@@ -4,6 +4,27 @@ All notable changes to this project are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (pre-1.0: minor = feature, patch =
 fix).
 
+## [Unreleased]
+
+### Fixed
+
+- `pack assets` inlined every file up to the 8 MiB CAR section cap, so a
+  typical directory's "proof" carried a complete second copy of the content
+  (a 6.2 MB glyph directory emitted a 6.28 MB CAR for a 32 KB manifest),
+  defeating lazy verification. Inlining is now all-or-nothing under a fixed
+  256 KiB budget: a directory whose files total at most 256 KiB travels
+  whole in the CAR — one fetch serves the bundle — and anything larger
+  emits the manifest alone, so clients fetch content from `{base}/{path}`
+  as specified. Anchors are unaffected: the anchor hashes the manifest
+  block alone, so existing published anchors stay valid and only the bag
+  shrinks.
+- `examples/assets.html` pinned a pre-MASL dag-pb fonts anchor that
+  `parseAssetAnchor` rejects, so the example failed against its own
+  library. The fixture is regenerated with the shipped `packAssets` (the
+  generator previously used a test helper), and `npm test` now runs
+  `examples/build-assets.ts`, whose drift guard keeps page and fixture in
+  sync.
+
 ## [0.4.0] — Routing hints
 
 **Routing hints** separate _where_ from _what_: an untrusted `hints.json`

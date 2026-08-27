@@ -25,7 +25,7 @@
     <!-- Everything this page renders is hash-verified before use: tiles
          against MAP_ANCHOR (range reads over the shard-tree proof), the style
          against STYLE_CID (a raw artifact — its own bytes are the trust
-         input), and every glyph range against FONTS_ANCHOR (a DAG artifact:
+         input), and every glyph range against FONTS_ANCHOR (a MASL bundle:
          ./assets/fonts mirrors the directory, ./assets/fonts.car is its
          proof; the two could live on different hosts). The style and glyphs
          are fixture files in this repo, so serve the checkout over HTTP
@@ -44,8 +44,8 @@
         // `npm run pack -- map.pmtiles` and paste the anchor + URL here.
         const MAP_ANCHOR = 'bafyrei…';
         const MAP_URL = 'https://tiles.example/map.pmtiles';
-        const STYLE_CID = 'bafkreihinewiz4nedsh6k26zibqhu3mlrwv44so3jbcdvb2pm7oqzm5ecq';
-        const FONTS_ANCHOR = 'bafybeibea5wyp7qouq2sn4naonhwqr6iupjdlbpos6wge2w5ixnwgmu4fm';
+        const STYLE_CID = 'bafkreic5izmd2gqyimensiazt347q4ovpykvpil5kik3b7inknzlbkpjsa';
+        const FONTS_ANCHOR = 'bafyreibpz2qxqbrcgj6n52v2imsd6iridgm35s5kakmx5ugb3ck6lkg2am';
 
         const badge = document.getElementById('badge');
         try {
@@ -58,7 +58,7 @@
             maplibregl.addProtocol('pmtiles', protocol.tile);
             protocol.add(new pmtiles.PMTiles(tiles)); // before the style loads
 
-            // Glyphs: a DAG artifact. The verified:// URLs inside the style
+            // Glyphs: a MASL bundle. The verified:// URLs inside the style
             // carry the trust anchor, never a location — the registry maps the
             // anchor to this instance, whose URLs come from page config.
             const fonts = new veritiles.VerifiedAsset({

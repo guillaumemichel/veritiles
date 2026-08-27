@@ -1,21 +1,22 @@
-// Builds the committed fixture behind examples/assets.html: imports the glyph
-// tree under examples/assets/fonts/ as a UnixFS DAG artifact (SPEC.md A9
-// profile), emits its proof CAR, derives the style raw artifact from the
-// resulting anchor, round-trips everything through the real VerifiedAsset
-// client, and drift-guards the anchors hardcoded in assets.html.
+// Builds the committed fixture behind examples/assets.html with the shipped
+// packer: packs the glyph tree under examples/assets/fonts/ into a MASL
+// bundle CAR (SPEC §3.2) via `packAssets`, derives the style raw artifact
+// from the resulting anchor, round-trips everything through the real
+// VerifiedAsset client, and drift-guards the anchors hardcoded in assets.html.
 //
-//   node examples/build-assets.ts
+//   node examples/build-assets.ts   (also runs as part of `npm test`)
 //
 // Rerun after changing anything under examples/assets/fonts/; if the guard
 // reports drift, paste the printed anchors into examples/assets.html.
 
 import assert from 'node:assert/strict';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { NotFoundError, VerifiedAsset } from '../src/index.ts';
-import { buildArtifact, serveArtifact, type TreeEntry } from '../test/helpers/artifact.ts';
+import { packAssets } from '../tools/pack.ts';
+import { buildArtifact, serveArtifact, type Artifact } from '../test/helpers/artifact.ts';
 
 // The published demo map the other examples render; the style's vector
 // source points at it by anchor. NOTE: predates 0.3.0's proof format —
@@ -28,13 +29,12 @@ const assetsDir = join(here, 'assets');
 const fontsDir = join(assetsDir, 'fonts');
 const htmlPath = join(here, 'assets.html');
 
-// ---- fonts: a DAG artifact (directory tree) with a proof CAR ----------------
+// ---- fonts: a MASL bundle CAR, packed by the shipped tool -------------------
 
-const entries = await collectTree(fontsDir);
-assert.ok(entries.length > 0, `no glyph files under ${fontsDir}`);
-const fonts = await buildArtifact(entries);
-assert.ok(fonts.proof, 'fonts artifact must be a DAG artifact with a proof');
-await writeFile(join(assetsDir, 'fonts.car'), fonts.proof);
+const packed = await packAssets(fontsDir);
+assert.ok(packed.files.size > 0, `no glyph files under ${fontsDir}`);
+const fonts: Artifact = { anchor: packed.anchor, rootCid: packed.anchor, files: packed.files, proof: packed.car };
+await writeFile(join(assetsDir, 'fonts.car'), packed.car);
 
 // ---- style: a raw artifact whose trust references embed the anchors ---------
 
@@ -71,7 +71,7 @@ const style = {
       source: 'pmtiles-source',
       'source-layer': 'places',
       // Prefer the latin name: the example ships only glyph ranges 0-511, and
-      // a range it lacks is an authenticated absence -> empty glyphs (A10).
+      // a range it lacks is an authenticated absence -> empty glyphs (SPEC §3.2).
       layout: {
         'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']],
         'text-size': 12,
@@ -105,27 +105,31 @@ const parsed = JSON.parse(new TextDecoder().decode(await styleAsset.bytes()));
 assert.ok(String(parsed.glyphs).includes(fonts.anchor), 'style must reference the fonts anchor');
 
 const fontsAsset = new VerifiedAsset({ cid: fonts.anchor, source: 'mem://fonts', fetchFn: server.fetch });
-const glyphPath = entries[0]!.path;
+const glyphPath = [...packed.files.keys()][0]!;
 const glyph = await fontsAsset.bytes(glyphPath);
-assert.equal(Buffer.compare(glyph, entries[0]!.bytes), 0, 'glyph read must be byte-identical');
+assert.equal(Buffer.compare(glyph, packed.files.get(glyphPath)!), 0, 'glyph read must be byte-identical');
 await assert.rejects(fontsAsset.bytes('Noto Sans Regular/nope.pbf'), NotFoundError);
 
+// Flipping every response's last byte corrupts the last glyph's inlined
+// section in the CAR (the manifest, at the front, still verifies) and every
+// content body. The lying section is discarded (SPEC §3.2) and the fallback
+// to `{base}/{path}` serves tampered bytes, so the read rejects.
 const tampered = serveArtifact([
   {
     base: 'mem://fonts',
     fixture: fonts,
     hooks: {
-      tamper: (url, bytes) => {
-        if (!url.endsWith('.pbf')) return undefined;
+      tamper: (_url, bytes) => {
         const copy = bytes.slice();
-        copy[0]! ^= 0xff;
+        copy[copy.length - 1]! ^= 0xff;
         return copy;
       },
     },
   },
 ]);
+const lastGlyphPath = [...packed.files.keys()].at(-1)!;
 const tamperedAsset = new VerifiedAsset({ cid: fonts.anchor, source: 'mem://fonts', fetchFn: tampered.fetch });
-await assert.rejects(tamperedAsset.bytes(glyphPath), AggregateError);
+await assert.rejects(tamperedAsset.bytes(lastGlyphPath), AggregateError);
 assert.equal(tamperedAsset.stats.rejected, 1, 'a tampered glyph must count one rejection');
 
 // ---- drift guard against assets.html ----------------------------------------
@@ -133,7 +137,7 @@ assert.equal(tamperedAsset.stats.rejected, 1, 'a tampered glyph must count one r
 const expected = { STYLE_CID: styleArtifact.anchor, FONTS_ANCHOR: fonts.anchor, MAP_ANCHOR };
 console.log('fixture written to examples/assets/:');
 console.log(`  style.json  ${styleBytes.length} B   STYLE_CID    ${expected.STYLE_CID}`);
-console.log(`  fonts.car   ${fonts.proof.length} B   FONTS_ANCHOR ${expected.FONTS_ANCHOR}`);
+console.log(`  fonts.car   ${packed.car.length} B   FONTS_ANCHOR ${expected.FONTS_ANCHOR}`);
 console.log(`  map (remote package)       MAP_ANCHOR   ${expected.MAP_ANCHOR}`);
 
 const html = await readFile(htmlPath, 'utf8').catch(() => undefined);
@@ -146,14 +150,4 @@ if (html === undefined) {
     process.exit(1);
   }
   console.log('assets.html anchors match — fixture and page are in sync.');
-}
-
-async function collectTree(dir: string): Promise<TreeEntry[]> {
-  const out: TreeEntry[] = [];
-  for (const entry of await readdir(dir, { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile()) continue;
-    const full = join(entry.parentPath, entry.name);
-    out.push({ path: relative(dir, full), bytes: await readFile(full) });
-  }
-  return out.sort((a, b) => (a.path < b.path ? -1 : 1));
 }

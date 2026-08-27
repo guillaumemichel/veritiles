@@ -302,6 +302,9 @@ npm run pack -- map.pmtiles --unixfs --full-car map.car
 
 # A verified path-addressed asset bundle:
 npm run pack -- assets ./public --out assets.car
+# → a directory totalling ≤ 256 KiB travels whole in the CAR (one fetch
+#   serves the bundle); anything larger emits the manifest alone — the
+#   proof — and clients fetch content from `{base}/{path}`
 ```
 
 Upload `map.pmtiles` and `map.pmtiles.proofs/` to any static host and

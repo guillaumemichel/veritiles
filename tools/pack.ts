@@ -627,12 +627,20 @@ export interface PackedAssets {
   files: Map<string, Uint8Array>;
 }
 
-/** Build a MASL bundle CAR from a directory. Large files stay URL-fetched. */
+// Inline policy for `pack assets`: a directory whose files total at most this
+// many bytes is carried whole in the bundle CAR, so one fetch serves the
+// bundle. Anything larger emits the manifest alone — the proof — and the
+// client fetches content from `{base}/{path}` (SPEC §3.2 fallback).
+const INLINE_TOTAL_CAP = 256 * 1024;
+
+/** Build a MASL bundle CAR from a directory. Directories over INLINE_TOTAL_CAP emit a manifest-only proof; content stays URL-fetched. */
 export async function packAssets(directory: string, { types = new Map<string, string>() }: { types?: Map<string, string> } = {}): Promise<PackedAssets> {
   const files = new Map<string, Uint8Array>();
   const entries: [string, { src: CID; size: number; contentType?: string }][] = [];
   const walk = async (relative: string): Promise<void> => {
-    for (const item of await readdir(join(directory, relative), { withFileTypes: true })) {
+    const items = await readdir(join(directory, relative), { withFileTypes: true });
+    items.sort((a, b) => (a.name < b.name ? -1 : 1));
+    for (const item of items) {
       const path = relative === '' ? item.name : `${relative}/${item.name}`;
       if (item.isDirectory()) { await walk(path); continue; }
       if (!item.isFile()) continue;
@@ -655,9 +663,13 @@ export async function packAssets(directory: string, { types = new Map<string, st
   const chunks: Uint8Array[] = [];
   const drain = (async () => { for await (const chunk of out) chunks.push(chunk); })();
   await writer.put({ cid: root, bytes: manifest });
-  for (const [path, bytes] of files) {
-    if (bytes.length > 2 ** 23) { process.stderr.write(`warning: ${path} exceeds CAR raw-section cap; it will be fetched from content URL\n`); continue; }
-    await writer.put({ cid: CID.createV1(RAW_CODE, Digest.create(SHA2_256, sha256Bytes(bytes))), bytes });
+  const total = [...files.values()].reduce((n, bytes) => n + bytes.length, 0);
+  if (total <= INLINE_TOTAL_CAP) {
+    for (const bytes of files.values()) {
+      await writer.put({ cid: CID.createV1(RAW_CODE, Digest.create(SHA2_256, sha256Bytes(bytes))), bytes });
+    }
+  } else {
+    process.stderr.write(`assets: ${total} B exceeds the ${INLINE_TOTAL_CAP} B inline budget; the CAR carries the manifest only and content is fetched from the content URL\n`);
   }
   await writer.close(); await drain;
   return { anchor: root.toString(), manifest, car: concatChunks(chunks), files };

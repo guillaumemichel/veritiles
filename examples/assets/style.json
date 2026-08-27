@@ -7,7 +7,7 @@
       "attribution": "<a href=\"https://github.com/protomaps/basemaps\">Protomaps</a> © <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors"
     }
   },
-  "glyphs": "verified://bafybeibea5wyp7qouq2sn4naonhwqr6iupjdlbpos6wge2w5ixnwgmu4fm/{fontstack}/{range}.pbf",
+  "glyphs": "verified://bafyreibpz2qxqbrcgj6n52v2imsd6iridgm35s5kakmx5ugb3ck6lkg2am/{fontstack}/{range}.pbf",
   "layers": [
     {
       "id": "background",
