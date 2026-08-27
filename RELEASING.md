@@ -37,12 +37,14 @@ spec.
 ## 2. CHANGELOG
 
 Add a top entry to `CHANGELOG.md` (Keep a Changelog format, no dates — npm and
-the git tags hold the timeline). A `## [X.Y.Z]` heading with `Added` /
-`Changed` / `Fixed` / `Notes` sections, newest first. Reuse the same text as the
+the git tags hold the timeline). A `## [X.Y.Z] — Short title` heading with
+`Added` / `Changed` / `Fixed` / `Notes` sections, newest first. The title names
+the release's headline in a few words (e.g. `Routing hints`) and becomes the
+GitHub Release title via the §6 extraction command. Reuse the same text as the
 annotated tag message and the GitHub Release body.
 
 ```markdown
-## [X.Y.Z]
+## [X.Y.Z] — Short title
 
 ### Added
 
@@ -138,7 +140,19 @@ for that tag to then fail red on the duplicate.
 - `https://unpkg.com/veritiles@X.Y.Z/dist/veritiles.js` resolves (unpkg may lag a
   minute), and the minor-range URL `…/veritiles@MAJOR.MINOR/…` redirects to it
 - CI drafted the GitHub Release with auto-generated notes; replace the body with
-  the changelog entry and publish it
+  the changelog entry and publish it. Extract the entry unwrapped (GitHub
+  renders every newline as a line break, so the changelog's ~80-column wrapping
+  must be joined):
+
+  ```
+  v=X.Y.Z
+  awk "/^## \[/{f=0} /^## \[$v\]/{f=1} f" CHANGELOG.md | awk 'function p(){if(b!=""){print b;b=""}} /^## /{sub(/^## \[/,"v");sub(/\]/,"");print;next} /^$/{p();print;next} /^[#-]/{p();b=$0;next} {sub(/^ +/,"");b=(b==""?$0:b" "$0)} END{p()}'
+  ```
+
+  The first output line (`vX.Y.Z — Title`) is the Release title; everything
+  after the blank line is the body. Pipe to `wl-copy` (or `xclip -selection
+  clipboard`) to paste into the web form, or drop the first two lines and pipe
+  into `gh release edit vX.Y.Z --notes-file - --draft=false`
 - Smoke-test an example against the new bundle if this release changed the client
   API (e.g. `examples/hints.html` after the routing-hints release)
 

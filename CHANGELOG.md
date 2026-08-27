@@ -4,7 +4,14 @@ All notable changes to this project are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (pre-1.0: minor = feature, patch =
 fix).
 
-## [0.4.0]
+## [0.4.0] — Routing hints
+
+**Routing hints** separate _where_ from _what_: an untrusted `hints.json`
+beside the page (or beside the data) maps CIDs to candidate locations, so hosts
+can move — or pages can ship anchor-only — without touching a verified byte.
+The layer is fully optional: a configured client never fetches a hint, wrong
+hints waste a request at worst, and every byte still verifies against the
+anchor.
 
 ### Added
 
@@ -50,14 +57,14 @@ fix).
 - No breaking changes: the descriptor, shard-tree, and MASL formats are
   unchanged, and every existing API keeps its signature and behavior.
 
-## [0.3.1]
+## [0.3.1] — UnixFS bridge
 
 ### Added
 
 - Optional UnixFS/IPFS bridge for `VerifiedFile` packs: `npm run pack --
-  --unixfs` embeds a reproducible UnixFS root CID (the standard
+--unixfs` embeds a reproducible UnixFS root CID (the standard
   `ipfs add --cid-version 1` layout) in the descriptor, and `--full-car
-  <path>` also writes that DAG as a CAR for `ipfs dag import` and pinning
+<path>` also writes that DAG as a CAR for `ipfs dag import` and pinning
   services. Purely additive — the map CID and proof tree are unchanged.
 
 ### Changed
@@ -74,7 +81,7 @@ fix).
   repository development tool (clone + `npm ci`), not part of the published
   npm package.
 
-## [0.3.0]
+## [0.3.0] — DASL compatibility
 
 ### Added
 
@@ -110,7 +117,7 @@ fix).
 - The previously hosted demo package predates this proof format and does not
   verify until republished.
 
-## [0.2.0]
+## [0.2.0] — Verified assets
 
 ### Added
 
@@ -125,7 +132,7 @@ fix).
 - Examples load the veritiles browser bundle from a CDN by default, so they
   run without a local build.
 
-## [0.1.0]
+## [0.1.0] — Verified PMTiles
 
 ### Added
 
