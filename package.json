@@ -1,6 +1,6 @@
 {
   "name": "veritiles",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Verified map tiles: a pmtiles-compatible Source that fetches PMTiles byte ranges from any dumb HTTP host and cryptographically verifies every byte against a content-addressed trust anchor (CID) before your map renders it.",
   "type": "module",
   "license": "MIT",
