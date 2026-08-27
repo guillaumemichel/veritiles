@@ -36,13 +36,13 @@ spec.
 
 ## 2. CHANGELOG
 
-Add a top entry to `CHANGELOG.md` (Keep a Changelog format). If the file does
-not exist yet, create it; a `## [X.Y.Z] — YYYY-MM-DD` heading with `Added` /
+Add a top entry to `CHANGELOG.md` (Keep a Changelog format, no dates — npm and
+the git tags hold the timeline). A `## [X.Y.Z]` heading with `Added` /
 `Changed` / `Fixed` / `Notes` sections, newest first. Reuse the same text as the
 annotated tag message and the GitHub Release body.
 
 ```markdown
-## [X.Y.Z] — YYYY-MM-DD
+## [X.Y.Z]
 
 ### Added
 
