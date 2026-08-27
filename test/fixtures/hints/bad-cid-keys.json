@@ -1,0 +1,8 @@
+{
+  "hints": {
+    "not-a-cid": ["https://a.example/x"],
+    "QmNkAUxwnaKnFzSBvDezfzQRMZyS7oh2gcRm1o3Sfugh1F": ["https://a.example/x"],
+    "bafybeiafaucqkbifaucqkbifaucqkbifaucqkbifaucqkbifaucqkbifau": ["https://a.example/x"],
+    "bafkreiabaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibae": ["https://good.example/x"]
+  }
+}

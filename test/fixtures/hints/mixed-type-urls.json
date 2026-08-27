@@ -1,0 +1,6 @@
+{
+  "hints": {
+    "bafkreiabaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibae": ["https://keep.example/1", 42, null, { "u": 1 }, ["nested"], "https://keep.example/2"],
+    "bafkreiacaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcai": "https://not-an-array.example/x"
+  }
+}

@@ -127,18 +127,39 @@ const source = new PMTilesVectorSource({
 without the pmtiles `Source` shape (`read(offset, length)` → `Uint8Array`).
 Both take:
 
-| option          | type                 | required | description                                                                                                                                   |
-| --------------- | -------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cid`           | `string`             | yes      | The anchor CID (CIDv1, base32, sha2-256), codec `dag-cbor` — the proof descriptor.                                                            |
-| `source`        | `string \| string[]` | yes      | URL(s) of the file itself, tried in order. Range + `206` required.                                                                            |
-| `proof`         | `string \| string[]` | no       | Proof base URL(s) — the directory holding `root` and the proof tree. Default `${source}.proofs`. Required explicitly if a source has a query. |
-| `fetchFn`       | `typeof fetch`       | no       | Replaces global `fetch` — instrumentation/test seam.                                                                                          |
-| `maxCacheBytes` | `number`             | no       | Budget for the verified-byte LRU cache (default 64 MiB).                                                                                      |
+| option          | type                 | required | description                                                                                                                                                                                                                   |
+| --------------- | -------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cid`           | `string`             | yes      | The anchor CID (CIDv1, base32, sha2-256), codec `dag-cbor` — the proof descriptor.                                                                                                                                            |
+| `source`        | `string \| string[]` | no       | URL(s) of the file itself, tried in order. Range + `206` required. Optional if a hints document supplies the location.                                                                                                        |
+| `proof`         | `string \| string[]` | no       | Proof base URL(s) — the directory holding `root` and the proof tree. Default `${source}.proofs`. Required explicitly if a source has a query.                                                                                 |
+| `hints`         | `string \| string[]` | no       | Routing-hints document URL(s), untrusted (`SPEC.md` §5). An explicit value is always consulted; its URLs join failover after configured ones. The default (`./hints.json` beside the page) is consulted only when a location is missing. Every hinted byte is verified against the anchor exactly as a configured one. |
+| `fetchFn`       | `typeof fetch`       | no       | Replaces global `fetch` — instrumentation/test seam.                                                                                                                                                                          |
+| `maxCacheBytes` | `number`             | no       | Budget for the verified-byte LRU cache (default 64 MiB).                                                                                                                                                                      |
 
-Construction is synchronous and validates the CID; the first read fetches
-`{proof}/root`, hashing it against the anchor — after that, every proof
-file and content slice is verified against the digest its parent
-committed. A failed open is retried on the next read.
+Construction is synchronous and validates the CID; the first read resolves
+locations (configured, then hinted) and fetches `{proof}/root`, hashing it
+against the anchor — after that, every proof file and content slice is verified
+against the digest its parent committed. A failed open is retried on the next
+read.
+
+```js
+// Ship only the anchor; put world's location in a sibling hints.json.
+const source = new veritiles.VerifiedSource({ cid: "bafyrei…" });
+```
+
+with, beside the page, `hints.json`:
+
+```json
+{
+  "hints": {
+    "bafyrei…desc": ["https://node.example/world.pmtiles.proofs"],
+    "bafkrei…file": ["https://cdn-a.example/world.pmtiles", "https://cdn-b.example/world.pmtiles"]
+  }
+}
+```
+
+Identity lives in the page (the `cid`), location lives in `hints.json` — each
+changes on its own cadence, and moving hosts is an edit to one JSON file.
 
 **Methods** (`VerifiedSource`, the pmtiles `Source` contract plus extras):
 
@@ -288,7 +309,7 @@ configure clients with the printed anchor. The packer cuts chunk
 boundaries at the ranges a pmtiles reader actually requests — one leaf per
 tile or tile group, zero over-fetch — and shapes the proof tree by zoom
 level, so low zooms stay shallow and the descriptor stays tiny at any
-scale. The generator profiles are documented in [`SPEC.md`](./SPEC.md) §8;
+scale. The generator profiles are documented in [`SPEC.md`](./SPEC.md) §7;
 `--profile fixed` packs non-PMTiles files. The reference application
 (PMTiles archive → verified map) lives in the
 [ipfs-pmtiles-demo](https://github.com/guillaumemichel/ipfs-pmtiles-demo)

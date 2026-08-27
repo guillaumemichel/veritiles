@@ -25,6 +25,14 @@ export interface VerifyStats {
   rejected: number;
 }
 
+// One place to look for a resource: a byte source and the path under it. The
+// failover loop tries candidates in order; bans are keyed on `source` identity,
+// so a lying host stays skipped however many paths reference it.
+export interface Candidate {
+  source: ByteSource;
+  path: string;
+}
+
 interface Inflight {
   promise: Promise<unknown>;
   controller: AbortController;
@@ -38,15 +46,21 @@ export class VerifiedStore {
   #maxCacheBytes: number;
   #inflight = new Map<string, Inflight>();
   // Sources that served bytes failing verification: tampering, not transport.
-  // Skipped by every fetch loop for the store's lifetime (SPEC §6.2, ban on tamper).
+  // Skipped by every fetch loop for the store's lifetime (SPEC §4, ban on tamper).
   #banned = new Set<ByteSource>();
   stats: VerifyStats = { verified: 0, rejected: 0 };
 
   constructor(
     sources: ByteSource[],
-    { maxCacheBytes = DEFAULT_CACHE_BYTES, stats }: { maxCacheBytes?: number; stats?: VerifyStats } = {},
+    {
+      maxCacheBytes = DEFAULT_CACHE_BYTES,
+      stats,
+      allowEmpty = false,
+    }: { maxCacheBytes?: number; stats?: VerifyStats; allowEmpty?: boolean } = {},
   ) {
-    if (!sources?.length) throw new Error('at least one source is required');
+    // A candidate-only store (per-resource bundle reads) carries no fixed
+    // sources — every location arrives with the call; `allowEmpty` opts in.
+    if (!allowEmpty && !sources?.length) throw new Error('at least one source is required');
     this.#sources = sources;
     this.#maxCacheBytes = maxCacheBytes;
     if (stats !== undefined) this.stats = stats;
@@ -78,12 +92,27 @@ export class VerifiedStore {
     cacheKey: string,
     cap: number,
     check: (bytes: Uint8Array) => Promise<number | void>,
+    opts: { signal?: AbortSignal } = {},
+  ): Promise<Uint8Array> {
+    return this.fetchCheckedCandidates(this.#sources.map((source) => ({ source, path })), cacheKey, cap, check, opts);
+  }
+
+  // The candidate form: verify one small resource against a caller-supplied
+  // check, trying an ordered list of (source, path) pairs. The primitive behind
+  // a bundle's per-resource reads, where configured bases carry `{path}` and
+  // hinted URLs carry the whole file (SPEC §5). Same cache, in-flight
+  // dedup, ordered failover, stats, and identity-keyed bans as fetchChecked.
+  async fetchCheckedCandidates(
+    candidates: Candidate[],
+    cacheKey: string,
+    cap: number,
+    check: (bytes: Uint8Array) => Promise<number | void>,
     { signal }: { signal?: AbortSignal } = {},
   ): Promise<Uint8Array> {
     signal?.throwIfAborted();
     const cached = this.getCached(cacheKey);
     if (cached !== undefined) return cached;
-    return this.#dedup(`whole:${cacheKey}`, signal, (s) => this.#fetchCheckedFrom(path, cacheKey, cap, check, s));
+    return this.#dedup(`whole:${cacheKey}`, signal, (s) => this.#fetchFromCandidates(candidates, cacheKey, cap, check, s));
   }
 
   // Verified whole small file (proof shard, meta) with a known digest:
@@ -207,15 +236,15 @@ export class VerifiedStore {
     }
   }
 
-  async #fetchCheckedFrom(
-    path: string,
+  async #fetchFromCandidates(
+    candidates: Candidate[],
     cacheKey: string,
     cap: number,
     check: (bytes: Uint8Array) => Promise<number | void>,
     signal: AbortSignal,
   ): Promise<Uint8Array> {
     const errors: unknown[] = [];
-    for (const source of this.#sources) {
+    for (const { source, path } of candidates) {
       if (this.#banned.has(source)) continue;
       try {
         const bytes = await source.fetchWhole(path, cap, { signal });
@@ -232,7 +261,7 @@ export class VerifiedStore {
         errors.push(err);
       }
     }
-    throw new AggregateError(errors, `all sources failed for ${path}`);
+    throw new AggregateError(errors, `all sources failed for ${cacheKey}`);
   }
 
   async #fetchRunFrom(

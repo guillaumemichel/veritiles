@@ -17,6 +17,14 @@ test('raw artifacts read the base URL and reject subpaths', async () => {
   assert.deepEqual(server.requests, [BASE]);
 });
 
+test('raw artifacts reject stat for both the root and subpaths, without a fetch', async () => {
+  const fixture = await buildRaw(); const server = serveArtifact([{ base: BASE, fixture }]);
+  const asset = new VerifiedAsset({ cid: fixture.anchor, source: BASE, fetchFn: server.fetch });
+  await assert.rejects(asset.stat(), /no declared size/);
+  await assert.rejects(asset.stat('x'), /no sub-paths/);
+  assert.deepEqual(server.requests, [], 'stat on a raw anchor never fetches');
+});
+
 test('empty raw artifact round-trips', async () => {
   const fixture = await buildRawEmpty(); const server = serveArtifact([{ base: BASE, fixture }]);
   const asset = new VerifiedAsset({ cid: fixture.anchor, source: BASE, fetchFn: server.fetch });

@@ -54,7 +54,7 @@ export class RangeSource {
     return readBody(res, length);
   }
 
-  // A file artifact's bytes live at `{base}` itself (SPEC §5.4); a member lives at
+  // A file artifact's bytes live at `{base}` itself (SPEC §3); a member lives at
   // `{base}/{path}`. The empty path must not append a trailing slash. The map
   // path never fetches '', so it is unaffected.
   #url(path: string): string {

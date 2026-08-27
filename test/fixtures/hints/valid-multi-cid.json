@@ -1,0 +1,6 @@
+{
+  "hints": {
+    "bafyreiadambqgaydambqgaydambqgaydambqgaydambqgaydambqgaydam": ["https://node.example/world.pmtiles.proofs"],
+    "bafkreiabaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibae": ["https://cdn-a.example/world.pmtiles", "https://cdn-b.example/world.pmtiles"]
+  }
+}

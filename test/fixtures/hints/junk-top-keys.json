@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "note": "reserved keys are ignored, not rejected",
+  "extra": { "anything": true },
+  "hints": {
+    "bafkreiabaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibae": ["https://cdn.example/world.pmtiles"]
+  }
+}

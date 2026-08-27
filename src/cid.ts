@@ -35,7 +35,7 @@ export function parseFileAnchor(text: unknown): Cid {
   return cid;
 }
 
-// The assets-path anchor gate (SPEC §2): a CIDv1, base32, sha2-256, 32-byte
+// The assets-path anchor gate (SPEC §1): a CIDv1, base32, sha2-256, 32-byte
 // digest whose codec is the CONTENT's own root — raw (one-chunk content) or
 // dag-cbor (a MASL manifest). Anything else rejects; clients MUST NOT sniff
 // bodies to decide.
@@ -77,6 +77,48 @@ export function decodeCidBytes(bytes: Uint8Array, cursor: { pos: number }, label
 const BASE32 = 'abcdefghijklmnopqrstuvwxyz234567';
 const BASE32_VALUE = new Int8Array(128).fill(-1);
 for (let i = 0; i < BASE32.length; i++) BASE32_VALUE[BASE32.charCodeAt(i)] = i;
+
+// Non-throwing DASL-CID parse for the tolerant hints parser (SPEC §5):
+// a hint key is valid only as a CIDv1 base32 sha2-256/32 with codec raw or
+// dag-cbor. Bad base32, CIDv0, dag-pb, or a wrong hash yields null so the
+// entry is skipped — the hints layer never throws a VerificationError.
+export function tryParseCid(text: unknown): Cid | null {
+  let cid: Cid;
+  try {
+    cid = parseCid(text, 'hint');
+  } catch {
+    return null;
+  }
+  if (cid.hashCode !== SHA2_256_CODE || cid.digest.length !== 32) return null;
+  if (cid.codec !== RAW_CODE && cid.codec !== DAG_CBOR_CODE) return null;
+  return cid;
+}
+
+// Canonical CIDv1 text (multibase base32, lowercase) — the inverse of
+// parseCid. Keys hints by CID and looks a binary CID (a descriptor's map, a
+// manifest's src) up in a hints document keyed the same way.
+export function cidToText(cid: Cid): string {
+  return `b${base32Encode(cid.bytes)}`;
+}
+
+// RFC 4648 base32, lowercase, no padding (multibase 'b'): the exact inverse of
+// base32Decode below — trailing bits pad with zeros, so every output decodes
+// back canonically.
+function base32Encode(bytes: Uint8Array): string {
+  let out = '';
+  let value = 0;
+  let bits = 0;
+  for (const byte of bytes) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      out += BASE32[(value >>> bits) & 31];
+    }
+  }
+  if (bits > 0) out += BASE32[(value << (5 - bits)) & 31];
+  return out;
+}
 
 export function parseCid(text: unknown, label: string): Cid {
   if (typeof text !== 'string') {

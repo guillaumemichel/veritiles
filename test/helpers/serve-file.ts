@@ -12,6 +12,8 @@ export interface FileHostHooks {
   tamperProof?: (path: string, bytes: Uint8Array) => Uint8Array | undefined;
   /** Force an HTTP status for a proof-relative path (or all when pathless). */
   proofStatus?: (path: string) => number | undefined;
+  /** Force an HTTP status for the file URL's ranged reads (transport failover). */
+  fileStatus?: () => number | undefined;
   onRequest?: (url: string, headers?: Record<string, string>) => void;
 }
 
@@ -41,6 +43,8 @@ export function servePackage(
     }
     const range = headers?.Range ?? headers?.range;
     if (url === fileUrl && range) {
+      const fileStatus = hooks.fileStatus?.();
+      if (fileStatus) return new Response('x', { status: fileStatus });
       const m = /^bytes=(\d+)-(\d+)$/.exec(range)!;
       const start = Number(m[1]);
       const end = Math.min(Number(m[2]) + 1, bytes.length);

@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>veritiles + MapLibre GL</title>
+    <title>veritiles + routing hints (anchor-only page)</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
     <script src="https://unpkg.com/maplibre-gl@6.2.0/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@6.2.0/dist/maplibre-gl.css" rel="stylesheet">
@@ -23,17 +23,26 @@
     <div id="map"></div>
     <div id="badge">loading…</div>
     <script>
-        // The anchor CID is the only trust input; the source URL is
-        // untrusted and could be any mirror serving the same bytes.
-        // NOTE: the hosted demo package predates veritiles 0.3.0's proof
-        // format. Republish the map with `npm run pack -- map.pmtiles`,
-        // upload map.pmtiles + map.pmtiles.proofs/, and paste the anchor
-        // and URL here.
-        const cid = 'bafyrei…'; // anchor printed by `npm run pack`
-        const source = new veritiles.VerifiedSource({
-            cid,
-            source: 'https://tiles.example/map.pmtiles', // proofs: + '.proofs'
-        });
+        // The self-contained page: it ships ONLY the anchor. Location lives in
+        // a sibling `hints.json` (untrusted — every byte is still verified
+        // against the anchor), so moving hosts is an edit to one JSON file, no
+        // page change and no re-anchor. Put beside this page, for example:
+        //
+        //   hints.json
+        //   {
+        //     "hints": {
+        //       "bafyrei…desc": ["https://node.example/world.pmtiles.proofs"],
+        //       "bafkrei…file": ["https://cdn-a.example/world.pmtiles",
+        //                        "https://cdn-b.example/world.pmtiles"]
+        //     }
+        //   }
+        //
+        // The descriptor CID maps to the proof base directory; the map's raw
+        // CID maps to the archive, with cdn-b as a failover. Both are printed
+        // by `npm run pack -- world.pmtiles`.
+        const source = new veritiles.VerifiedSource({ cid: 'bafyrei…' });
+        // `hints` defaults to './hints.json'; pass it to point elsewhere,
+        // or `source`/`proof` to configure hosts directly instead.
 
         const protocol = new pmtiles.Protocol();
         maplibregl.addProtocol('pmtiles', protocol.tile);
@@ -48,7 +57,7 @@
                 sources: {
                     verified: {
                         type: 'vector',
-                        url: 'pmtiles://' + cid,
+                        url: 'pmtiles://' + source.getKey(),
                         attribution: '<a href="https://github.com/protomaps/basemaps">Protomaps</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
                     },
                 },

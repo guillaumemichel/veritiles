@@ -37,7 +37,7 @@ export function rawSection(block: Uint8Array): Section {
 }
 
 // A section whose claimed CID lies about its bytes: parses (claims are index
-// keys), caught only when the block is used and hashed (SPEC §3.1, §5.2).
+// keys), caught only when the block is used and hashed (SPEC §3.3).
 export function lyingSection(claimedDigest: Uint8Array, block: Uint8Array, codec = DAG_PB): Section {
   return { cidBytes: CID.createV1(codec, Digest.create(SHA2_256, claimedDigest)).bytes, block };
 }

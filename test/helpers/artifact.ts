@@ -6,17 +6,20 @@ import { encodeManifest } from '../../src/manifest.ts';
 import type { FetchFn } from '../../src/range-source.ts';
 
 export interface TreeEntry { path: string; bytes: Uint8Array; contentType?: string; }
-export interface Artifact { anchor: string; rootCid: string; files: Map<string, Uint8Array>; proof?: Uint8Array; }
+export interface Artifact { anchor: string; rootCid: string; files: Map<string, Uint8Array>; proof?: Uint8Array; srcCids?: Map<string, string>; }
+export interface BuildOptions { inlineRaw?: boolean }
 
-export async function buildArtifact(input: Uint8Array | TreeEntry[]): Promise<Artifact> {
+export async function buildArtifact(input: Uint8Array | TreeEntry[], { inlineRaw = true }: BuildOptions = {}): Promise<Artifact> {
   if (input instanceof Uint8Array) {
     const cid = CID.createV1(0x55, await sha256.digest(input));
     return { anchor: cid.toString(), rootCid: cid.toString(), files: new Map([['', input]]) };
   }
   const files = new Map(input.map(({ path, bytes }) => [path, bytes]));
+  const srcCids = new Map<string, string>();
   const entries: [string, { src: { codec: number; hashCode: number; digest: Uint8Array; bytes: Uint8Array }; size: number; contentType?: string }][] = [];
   for (const file of input) {
     const cid = CID.createV1(0x55, await sha256.digest(file.bytes));
+    srcCids.set(file.path, cid.toString());
     entries.push([`/${file.path}`, { src: { codec: cid.code, hashCode: cid.multihash.code, digest: cid.multihash.digest, bytes: cid.bytes }, size: file.bytes.length, ...(file.contentType === undefined ? {} : { contentType: file.contentType }) }]);
   }
   const manifest = encodeManifest(entries, { withType: true });
@@ -25,11 +28,13 @@ export async function buildArtifact(input: Uint8Array | TreeEntry[]): Promise<Ar
   const chunks: Uint8Array[] = [];
   const drain = (async () => { for await (const chunk of out) chunks.push(chunk); })();
   await writer.put({ cid: root, bytes: manifest });
-  for (const file of input) {
-    if (file.bytes.length <= 2 ** 23) await writer.put({ cid: CID.createV1(0x55, await sha256.digest(file.bytes)), bytes: file.bytes });
+  const seen = new Set<string>();
+  if (inlineRaw) for (const file of input) {
+    const cid = CID.createV1(0x55, await sha256.digest(file.bytes));
+    if (file.bytes.length <= 2 ** 23 && !seen.has(cid.toString())) { seen.add(cid.toString()); await writer.put({ cid, bytes: file.bytes }); }
   }
   await writer.close(); await drain;
-  return { anchor: root.toString(), rootCid: root.toString(), files, proof: concat(chunks) };
+  return { anchor: root.toString(), rootCid: root.toString(), files, proof: concat(chunks), srcCids };
 }
 
 export interface ServeHooks { tamper?: (url: string, bytes: Uint8Array) => Uint8Array | undefined; status?: (url: string) => number | undefined; dropProof?: boolean; }

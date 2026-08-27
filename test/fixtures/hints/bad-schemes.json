@@ -1,0 +1,5 @@
+{
+  "hints": {
+    "bafkreiabaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibae": ["file:///etc/passwd", "data:text/plain,x", "javascript:alert(1)", "ftp://h.example/x", "http://h.example/ok", "https://h.example/ok2"]
+  }
+}

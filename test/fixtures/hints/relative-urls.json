@@ -1,0 +1,5 @@
+{
+  "hints": {
+    "bafkreiabaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibae": ["./x", "../y/", "sub/z", "https://other.example/w/"]
+  }
+}

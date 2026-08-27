@@ -394,6 +394,24 @@ test('S-08 a non-VerificationError from check is transport: no ban, no rejected'
   assert.ok(log.some((l) => l.startsWith('s1:')), 'source 1 not banned, tried again');
 });
 
+test('HS-01 fetchCheckedCandidates fails over across differing paths and bans by source identity', async () => {
+  const bytesA = deterministicBytes(100, 50);
+  const bytesB = deterministicBytes(80, 51);
+  const log: string[] = [];
+  const liar = source({ files: new Map([['pathA', bytesA], ['pathB', bytesB]]) }, { onRequest: (w) => log.push(`liar:${w}`), tamper: (b) => flipByte(b) });
+  const good = source({ files: new Map([['mirrorA', bytesA], ['mirrorB', bytesB]]) }, { onRequest: (w) => log.push(`good:${w}`) });
+  const store = new VerifiedStore([], { allowEmpty: true });
+
+  const a = await store.fetchCheckedCandidates([{ source: liar, path: 'pathA' }, { source: good, path: 'mirrorA' }], 'A', 4096, okCheck(bytesA));
+  assert.deepEqual(a, bytesA);
+  assert.equal(store.stats.rejected, 1);
+
+  log.length = 0;
+  const b = await store.fetchCheckedCandidates([{ source: liar, path: 'pathB' }, { source: good, path: 'mirrorB' }], 'B', 4096, okCheck(bytesB));
+  assert.deepEqual(b, bytesB);
+  assert.ok(!log.some((l) => l.startsWith('liar:')), 'the banned source is skipped by identity, whatever the path');
+});
+
 test('S-09 aborting mid-fetchChecked rejects and leaves the store usable', async () => {
   const bytes = deterministicBytes(100, 42);
   const hanging: ByteSource = {

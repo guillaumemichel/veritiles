@@ -58,6 +58,11 @@ test('F-01: constructor validation', async () => {
   assert.throws(() => new VerifiedFile({ cid: good.anchor, source: [123 as unknown as string] }), Error);
   assert.throws(() => new VerifiedFile({ cid: good.anchor, source: 'https://h/f?v=1' }), Error); // query, no explicit proof
   assert.doesNotThrow(() => new VerifiedFile({ cid: good.anchor, source: 'https://h/f?v=1', proof: 'https://h/p' }));
+  // Locations are optional now: a bare anchor, or an anchor + hints, both construct.
+  assert.doesNotThrow(() => new VerifiedFile({ cid: good.anchor }));
+  assert.doesNotThrow(() => new VerifiedFile({ cid: good.anchor, hints: 'https://h/hints.json' }));
+  // A query-string source with no proof but explicit hints defers the proof question to open.
+  assert.doesNotThrow(() => new VerifiedFile({ cid: good.anchor, source: 'https://h/f?v=1', hints: 'https://h/hints.json' }));
 });
 
 // F-02 — proof base derivation and ready().
