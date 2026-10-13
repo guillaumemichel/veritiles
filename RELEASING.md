@@ -143,20 +143,29 @@ for that tag to then fail red on the duplicate.
 - `npm view veritiles dist-tags.latest` → `X.Y.Z`
 - `https://unpkg.com/veritiles@X.Y.Z/dist/veritiles.js` resolves (unpkg may lag a
   minute), and the minor-range URL `…/veritiles@MAJOR.MINOR/…` redirects to it
-- CI drafted the GitHub Release with auto-generated notes; replace the body with
-  the changelog entry and publish it. Extract the entry unwrapped (GitHub
-  renders every newline as a line break, so the changelog's ~80-column wrapping
-  must be joined):
+- CI drafted the GitHub Release with GitHub's generated notes. Replace its body
+  with, in order: a `# vX.Y.Z — Title` heading; 3–5 one-line highlights from
+  the changelog entry, each `- <emoji> **Title.** One sentence.`, plus a
+  `- ⚠️ **Breaking.** …` line when the release breaks anything; the entry's
+  Added/Changed/Fixed/Notes collapsed under `<details>`; then GitHub's
+  generated "What's Changed", "New Contributors" and "Full Changelog" lines.
+  The title stays `vX.Y.Z`. Write the highlights to `/tmp/highlights.md`, then:
 
   ```
-  v=X.Y.Z
-  awk "/^## \[/{f=0} /^## \[$v\]/{f=1} f" CHANGELOG.md | awk 'function p(){if(b!=""){print b;b=""}} /^## /{sub(/^## \[/,"v");sub(/\]/,"");print;next} /^$/{p();print;next} /^[#-]/{p();b=$0;next} {sub(/^ +/,"");b=(b==""?$0:b" "$0)} END{p()}'
+  v=X.Y.Z prev=A.B.C   # this release and the one before it
+  entry=$(awk "/^## \[/{f=0} /^## \[$v\]/{f=1} f" CHANGELOG.md | awk 'function p(){if(b!=""){print b;b=""}} /^## /{sub(/^## \[/,"v");sub(/\]/,"");print;next} /^$/{p();print;next} /^[#-]/{p();b=$0;next} {sub(/^ +/,"");b=(b==""?$0:b" "$0)} END{p()}')
+  {
+    printf '# %s\n\n' "$(printf '%s\n' "$entry" | head -1)"
+    cat /tmp/highlights.md
+    printf '\n<details>\n<summary>Detailed changes</summary>\n\n%s\n\n</details>\n\n' "$(printf '%s\n' "$entry" | sed -n '/^### /,$p')"
+    gh api -X POST repos/guillaumemichel/veritiles/releases/generate-notes -f tag_name="v$v" -f previous_tag_name="v$prev" --jq .body
+  } | gh release edit "v$v" --notes-file -
   ```
 
-  The first output line (`vX.Y.Z — Title`) is the Release title; everything
-  after the blank line is the body. Pipe to `wl-copy` (or `xclip -selection
-  clipboard`) to paste into the web form, or drop the first two lines and pipe
-  into `gh release edit vX.Y.Z --notes-file - --draft=false`
+  The second `awk` joins the changelog's ~80-column wrapping, since GitHub
+  renders every newline in a release body as a line break. `gh release edit`
+  keeps the draft's tag; a raw API `PATCH` without `tag_name` detaches it.
+  Review the draft on GitHub, then publish it.
 - Smoke-test an example against the new bundle if this release changed the client
   API (e.g. `examples/hints.html` after the routing-hints release)
 
@@ -171,5 +180,5 @@ for that tag to then fail red on the duplicate.
 - [ ] `chore: release vX.Y.Z` commit + `vX.Y.Z` tag
 - [ ] `git push origin main --follow-tags`
 - [ ] Release workflow green — CI published to npm (gate re-ran via `prepublishOnly`)
-- [ ] unpkg serves `@X.Y.Z`; draft GitHub Release body swapped for the changelog
-      entry and published
+- [ ] unpkg serves `@X.Y.Z`; draft GitHub Release body set to highlights, the
+      collapsed changelog and the generated contributor notes, then published
