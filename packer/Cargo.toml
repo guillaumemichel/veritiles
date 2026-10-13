@@ -1,0 +1,27 @@
+[package]
+name = "veritiles-pack"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+description = "Packs a file into a veritiles proof tree (byte-identical to tools/pack.ts)"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "veritiles-pack"
+path = "src/main.rs"
+
+[dependencies]
+blake3 = "1.8.7"
+brotli-decompressor = "6"
+flate2 = { version = "1.1", default-features = false, features = ["zlib-rs"] }
+libc = "0.2.190"
+memmap2 = "0.9.11"
+rayon = "1.12.0"
+sha2 = "0.11.0"
+zstd = { version = "0.14", default-features = false }
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"

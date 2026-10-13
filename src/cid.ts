@@ -12,6 +12,8 @@ export const RAW_CODE = 0x55;
 export const DAG_PB_CODE = 0x70;
 export const DAG_CBOR_CODE = 0x71;
 export const SHA2_256_CODE = 0x12;
+// BDASL: only a descriptor's `map` uses it, and no client ever computes it.
+export const BLAKE3_CODE = 0x1e;
 
 export interface Cid {
   codec: number;
@@ -80,8 +82,9 @@ for (let i = 0; i < BASE32.length; i++) BASE32_VALUE[BASE32.charCodeAt(i)] = i;
 
 // Non-throwing DASL-CID parse for the tolerant hints parser (SPEC §5):
 // a hint key is valid only as a CIDv1 base32 sha2-256/32 with codec raw or
-// dag-cbor. Bad base32, CIDv0, dag-pb, or a wrong hash yields null so the
-// entry is skipped — the hints layer never throws a VerificationError.
+// dag-cbor, or a BLAKE3/32 raw CID (a descriptor's map). Bad base32, CIDv0,
+// dag-pb, or a wrong hash yields null so the entry is skipped — the hints
+// layer never throws a VerificationError.
 export function tryParseCid(text: unknown): Cid | null {
   let cid: Cid;
   try {
@@ -89,7 +92,9 @@ export function tryParseCid(text: unknown): Cid | null {
   } catch {
     return null;
   }
-  if (cid.hashCode !== SHA2_256_CODE || cid.digest.length !== 32) return null;
+  if (cid.digest.length !== 32) return null;
+  if (cid.hashCode === BLAKE3_CODE) return cid.codec === RAW_CODE ? cid : null;
+  if (cid.hashCode !== SHA2_256_CODE) return null;
   if (cid.codec !== RAW_CODE && cid.codec !== DAG_CBOR_CODE) return null;
   return cid;
 }

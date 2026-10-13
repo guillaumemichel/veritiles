@@ -1,7 +1,7 @@
 // Golden compatibility: the fixture is the first 64 KiB of a REAL PMTiles
-// world extract. Its MAP CID is byte-stable and identical to what kubo 0.41
-// prints for `ipfs add --cid-version 1 -Q --chunker size-16384` — the
-// descriptor's content binding. The anchor (dag-cbor descriptor CID) is
+// world extract. Its map CID is byte-stable and identical to what kubo 0.43
+// prints for `ipfs add --only-hash -Q --cid-version 1 --hash blake3
+// --raw-leaves --chunker size-1048576` — the descriptor's content name. The anchor (dag-cbor descriptor CID) is
 // frozen below; if the zero-dependency CID / descriptor / proof code ever
 // drifts, this fails.
 
@@ -16,15 +16,15 @@ import { decodeDescriptor } from '../src/descriptor.ts';
 import { decodeMeta, KIND_SHARD } from '../src/proof-format.ts';
 import { buildProofPackage } from './helpers/package.ts';
 import { servePackage } from './helpers/serve-file.ts';
-import { sha256Bytes } from './helpers/bytes.ts';
+import { blake3Bytes, sha256Bytes } from './helpers/bytes.ts';
 
 
 const headBytes = new Uint8Array(await readFile(new URL('./fixtures/golden/map.head.bin', import.meta.url)));
 const cuts = [16384, 16384, 16384, 16384];
 const pkg = await buildProofPackage({ mapBytes: headBytes, cuts });
 
-test('G-01 the real archive head binds its raw whole-file CID', () => {
-  assert.equal(pkg.mapCid, CID.createV1(0x55, Digest.create(0x12, sha256Bytes(headBytes))).toString());
+test('G-01 the real archive head binds its raw whole-file CID', async () => {
+  assert.equal(pkg.mapCid, CID.createV1(0x55, Digest.create(0x1e, await blake3Bytes(headBytes))).toString());
   assert.equal(pkg.leaves.length, cuts.length);
   let expected = 0;
   for (const leaf of pkg.leaves) {

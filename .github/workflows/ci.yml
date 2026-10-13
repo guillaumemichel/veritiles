@@ -23,3 +23,30 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  packer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.95
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packer
+      - run: cargo fmt --check
+        working-directory: packer
+      - run: cargo clippy --all-targets -- -D warnings
+        working-directory: packer
+      - run: cargo test
+        working-directory: packer
+      - run: cargo build --release
+        working-directory: packer
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # The Rust unit-test fixtures must match what the TS generator writes.
+      - run: node tools/gen-rust-vectors.ts "$RUNNER_TEMP/fixtures" && diff -r "$RUNNER_TEMP/fixtures" packer/tests/fixtures
+      - run: npm run test:diff

@@ -1,0 +1,250 @@
+{
+ "description": "encodeDescriptor; topMeta = buildProofTree([N leaves of 2^32 bytes at 0, 2^32, …]).topMeta with the u64le-offset digest rule; descriptor hex omitted when large",
+ "cases": [
+  {
+   "mapCid": "bafkr4ibaelwj2vy3u52m7hud2amusyxv2hr2ugsi2sdkm7rhmktmpfmqcu",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 1,
+   "descriptor": "a4617601636d6170d82a58250001551e202022ec9d571ba774cf9e83d0194962f5d1e3aa1a48d486a67e2762a6c7959015646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f52676d617053697a6501",
+   "descriptorSha256": "5332507d645db1c1841cd89cd810cab7f17fd3c0970358b7926cf3417cfdf5de",
+   "anchor": "bafyreictgjih2zc5whayihgyttmbbsvx6f75hqexanmlpetm6naxz7pv3y"
+  },
+  {
+   "mapCid": "bafkr4ibaelwj2vy3u52m7hud2amusyxv2hr2ugsi2sdkm7rhmktmpfmqcu",
+   "unixfsCid": "bafybeicl6ujc6ncfktctxxroxognfn7d2fqavvrryoc2lv6m4i6hpbkfti",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 1,
+   "descriptor": "a5617601636d6170d82a58250001551e202022ec9d571ba774cf9e83d0194962f5d1e3aa1a48d486a67e2762a6c7959015646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f5266756e69786673d82a582500017012204bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a676d617053697a6501",
+   "descriptorSha256": "aecb2530c4d45d13d4cce48c63ad5c3d7dab099a09e9b7b5f385b69665529834",
+   "anchor": "bafyreifozmstbrguluj5jtherrr22xb5pwvqtgqj5g33l44fw2lgkuuygq"
+  },
+  {
+   "mapCid": "bafkr4ighkvbhq5zkrksik5t6vqhx5kst7cjv5aq7mcrh5atwchvbkoy7ce",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 23,
+   "descriptor": "a4617601636d6170d82a58250001551e20c7554278772a8aa485767eac0f7eaa53f8935e821f60a27e827611ea153b1f11646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f52676d617053697a6517",
+   "descriptorSha256": "7e5fe494e5448700a2d9974d7ecebc55e4ad027dd1a423fbfbc74c070eec1598",
+   "anchor": "bafyreid6l7sjjzkeq4akfwmxjv7m5pcv4swqe7oruqr7x66hjqdq53avta"
+  },
+  {
+   "mapCid": "bafkr4ighkvbhq5zkrksik5t6vqhx5kst7cjv5aq7mcrh5atwchvbkoy7ce",
+   "unixfsCid": "bafybeicl6ujc6ncfktctxxroxognfn7d2fqavvrryoc2lv6m4i6hpbkfti",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 23,
+   "descriptor": "a5617601636d6170d82a58250001551e20c7554278772a8aa485767eac0f7eaa53f8935e821f60a27e827611ea153b1f11646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f5266756e69786673d82a582500017012204bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a676d617053697a6517",
+   "descriptorSha256": "ced41cc62ea8084c905c87890760f0d6a0987d10e0ef0196b39ab742a60417e9",
+   "anchor": "bafyreigo2qommlvibbgjaxehredwb4gwucmh2eha54aznm42w5bkmbax5e"
+  },
+  {
+   "mapCid": "bafkr4iaumt6hxkkrowrqyhoqwv6djegegj6zxhnbpbttdf7kyhi5ftszka",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 24,
+   "descriptor": "a4617601636d6170d82a58250001551e201464fc7ba95175a30c1dd0b57c3490c4327d9b9da178673197eac1d1d2ce5950646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f52676d617053697a651818",
+   "descriptorSha256": "6ea2f9fd36fd02d30ba40027bef16f25dd2e233f599e01e103d0ace4a424374e",
+   "anchor": "bafyreidoul472nx5aljqxjaae67pc3zf3uxcgp2ztya6ca6qvtskijbxjy"
+  },
+  {
+   "mapCid": "bafkr4iaumt6hxkkrowrqyhoqwv6djegegj6zxhnbpbttdf7kyhi5ftszka",
+   "unixfsCid": "bafybeicl6ujc6ncfktctxxroxognfn7d2fqavvrryoc2lv6m4i6hpbkfti",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 24,
+   "descriptor": "a5617601636d6170d82a58250001551e201464fc7ba95175a30c1dd0b57c3490c4327d9b9da178673197eac1d1d2ce5950646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f5266756e69786673d82a582500017012204bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a676d617053697a651818",
+   "descriptorSha256": "2d03151932185317b7a7b84b1670e66ee3132d93da29fe5c33b323556db7b958",
+   "anchor": "bafyreibnamkrsmqykml3pj5yjmlhbzto4mjs3e62fh7fym5tenkw3n5zla"
+  },
+  {
+   "mapCid": "bafkr4ifmnqa3ymxmwr3sln3iqcj4vcm5brqfujkiv474jux57h2nzxfvhu",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 255,
+   "descriptor": "a4617601636d6170d82a58250001551e20ac6c01bc32ecb47725b7688093ca899d0c605a2548af3fc4d2fdf9f4dcdcb53d646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f52676d617053697a6518ff",
+   "descriptorSha256": "f674aff1a056015d17e2c0c8f40ec010ed4eb4d4bf7353e8a2175b28dd611ccb",
+   "anchor": "bafyreihwosx7dicwaforpywazd2a5qaq5vhljvf7onj6riqxlmun2yi4zm"
+  },
+  {
+   "mapCid": "bafkr4ifmnqa3ymxmwr3sln3iqcj4vcm5brqfujkiv474jux57h2nzxfvhu",
+   "unixfsCid": "bafybeicl6ujc6ncfktctxxroxognfn7d2fqavvrryoc2lv6m4i6hpbkfti",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 255,
+   "descriptor": "a5617601636d6170d82a58250001551e20ac6c01bc32ecb47725b7688093ca899d0c605a2548af3fc4d2fdf9f4dcdcb53d646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f5266756e69786673d82a582500017012204bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a676d617053697a6518ff",
+   "descriptorSha256": "ee7e2df80daff0e0fc4118282e4433a5aa7fbfd45095ec62bfcac8d1130a2a18",
+   "anchor": "bafyreihopyw7qdnp6dqpyqiyfaxeim5fvj737vcqsxwgfp6kzdirgcrkda"
+  },
+  {
+   "mapCid": "bafkr4idion3msmgxaifdf4cmhfx4fzpkwsonbgttr6qd2vzqgnawu2shzy",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 256,
+   "descriptor": "a4617601636d6170d82a58250001551e20687376c930d7020a32f04c396fc2e5eab49cd09a738fa03d573033416a6a47ce646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f52676d617053697a65190100",
+   "descriptorSha256": "9104821cd659aac20fe0295963bf8b2cf8bad5611e97ebd33b13c0e1e342c125",
+   "anchor": "bafyreierasbbzvszvlba7ybjlfr37czm7c5nkyi6s7v5goytydq6gqwbeu"
+  },
+  {
+   "mapCid": "bafkr4idion3msmgxaifdf4cmhfx4fzpkwsonbgttr6qd2vzqgnawu2shzy",
+   "unixfsCid": "bafybeicl6ujc6ncfktctxxroxognfn7d2fqavvrryoc2lv6m4i6hpbkfti",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 256,
+   "descriptor": "a5617601636d6170d82a58250001551e20687376c930d7020a32f04c396fc2e5eab49cd09a738fa03d573033416a6a47ce646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f5266756e69786673d82a582500017012204bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a676d617053697a65190100",
+   "descriptorSha256": "b32c8b1ae54dc5d274bf17a41b1907ace8e5a9130a14381abf03ef2e80ac9ae4",
+   "anchor": "bafyreiftfsfrvzknyxjhjpyxuqnrsb5m5ds2seykcq4bvpyd54xible24q"
+  },
+  {
+   "mapCid": "bafkr4ifmnqa3ymxmwr3sln3iqcj4vcm5brqfujkiv474jux57h2nzxfvhu",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 65535,
+   "descriptor": "a4617601636d6170d82a58250001551e20ac6c01bc32ecb47725b7688093ca899d0c605a2548af3fc4d2fdf9f4dcdcb53d646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f52676d617053697a6519ffff",
+   "descriptorSha256": "328ba17b2d5fdb13ecbe2b7991716b5d123023318cd3d6b0240bb9568c9d4a04",
+   "anchor": "bafyreibsroqxwlk73mj6zprlpgixc225ciycgmmm2pllajalxflizhkkaq"
+  },
+  {
+   "mapCid": "bafkr4ifmnqa3ymxmwr3sln3iqcj4vcm5brqfujkiv474jux57h2nzxfvhu",
+   "unixfsCid": "bafybeicl6ujc6ncfktctxxroxognfn7d2fqavvrryoc2lv6m4i6hpbkfti",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 65535,
+   "descriptor": "a5617601636d6170d82a58250001551e20ac6c01bc32ecb47725b7688093ca899d0c605a2548af3fc4d2fdf9f4dcdcb53d646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f5266756e69786673d82a582500017012204bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a676d617053697a6519ffff",
+   "descriptorSha256": "f4424dc0058b1ed939fe7dd3b981efea4565c7c3edb3d222493bd7cf055c3364",
+   "anchor": "bafyreihuijg4abmld3mtt7t52o4yd37kivs4pq7nwpjcesj327hqkxbtmq"
+  },
+  {
+   "mapCid": "bafkr4idion3msmgxaifdf4cmhfx4fzpkwsonbgttr6qd2vzqgnawu2shzy",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 65536,
+   "descriptor": "a4617601636d6170d82a58250001551e20687376c930d7020a32f04c396fc2e5eab49cd09a738fa03d573033416a6a47ce646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f52676d617053697a651a00010000",
+   "descriptorSha256": "d283124738729fdf87af78f91b849e3b1f57b2cecdc6eebf21b2019dc31899b5",
+   "anchor": "bafyreigsqmjeoodst7pypl3y7enyjhr3d5l3ftwny3xl6insago4ggezwu"
+  },
+  {
+   "mapCid": "bafkr4idion3msmgxaifdf4cmhfx4fzpkwsonbgttr6qd2vzqgnawu2shzy",
+   "unixfsCid": "bafybeicl6ujc6ncfktctxxroxognfn7d2fqavvrryoc2lv6m4i6hpbkfti",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 65536,
+   "descriptor": "a5617601636d6170d82a58250001551e20687376c930d7020a32f04c396fc2e5eab49cd09a738fa03d573033416a6a47ce646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f5266756e69786673d82a582500017012204bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a676d617053697a651a00010000",
+   "descriptorSha256": "7221979ef88ec6678d01b4d0ebc3c4c25dec85e70dd61b1a328cdaa47f3307c3",
+   "anchor": "bafyreidseglz56eoyzty2anu2dv4hrgclxwilzyn2ynrumum3ksh6myhym"
+  },
+  {
+   "mapCid": "bafkr4ifmnqa3ymxmwr3sln3iqcj4vcm5brqfujkiv474jux57h2nzxfvhu",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 4294967295,
+   "descriptor": "a4617601636d6170d82a58250001551e20ac6c01bc32ecb47725b7688093ca899d0c605a2548af3fc4d2fdf9f4dcdcb53d646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f52676d617053697a651affffffff",
+   "descriptorSha256": "9c878b511a05d3184862fe8a81b1628bb10c512fad81dcb854a438b000ef3a27",
+   "anchor": "bafyreie4q6fvcgqf2mmeqyx6rka3cyulwegfcl5nqholqvfehcyab3z2e4"
+  },
+  {
+   "mapCid": "bafkr4ifmnqa3ymxmwr3sln3iqcj4vcm5brqfujkiv474jux57h2nzxfvhu",
+   "unixfsCid": "bafybeicl6ujc6ncfktctxxroxognfn7d2fqavvrryoc2lv6m4i6hpbkfti",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 4294967295,
+   "descriptor": "a5617601636d6170d82a58250001551e20ac6c01bc32ecb47725b7688093ca899d0c605a2548af3fc4d2fdf9f4dcdcb53d646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f5266756e69786673d82a582500017012204bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a676d617053697a651affffffff",
+   "descriptorSha256": "3323ed05fb4fe6e9130d3a8a9fd3eac4853b7a67fddccdacbbe475bc449a8393",
+   "anchor": "bafyreibtepwql62p43urgdj2rkp5h2wequ5xuz753tg2zo7eow6ejgudsm"
+  },
+  {
+   "mapCid": "bafkr4idion3msmgxaifdf4cmhfx4fzpkwsonbgttr6qd2vzqgnawu2shzy",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 4294967296,
+   "descriptor": "a4617601636d6170d82a58250001551e20687376c930d7020a32f04c396fc2e5eab49cd09a738fa03d573033416a6a47ce646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f52676d617053697a651b0000000100000000",
+   "descriptorSha256": "50a37a848090d42fd0435ceb6f418150364d778f22ffffc8c80815a947a3cdde",
+   "anchor": "bafyreicqun5ijaeq2qx5aq245nxudakqgzgxpdzc7774rsaicwuupi6n3y"
+  },
+  {
+   "mapCid": "bafkr4idion3msmgxaifdf4cmhfx4fzpkwsonbgttr6qd2vzqgnawu2shzy",
+   "unixfsCid": "bafybeicl6ujc6ncfktctxxroxognfn7d2fqavvrryoc2lv6m4i6hpbkfti",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 4294967296,
+   "descriptor": "a5617601636d6170d82a58250001551e20687376c930d7020a32f04c396fc2e5eab49cd09a738fa03d573033416a6a47ce646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f5266756e69786673d82a582500017012204bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a676d617053697a651b0000000100000000",
+   "descriptorSha256": "ace19b24cd5c0ee3e463cf2abad8cb5dba03c5f018bfbe14be2eb32add3d0640",
+   "anchor": "bafyreifm4gnsjtk4b3r6iy6pfk5nrs25xib4l4ayx67bjprowmvn2pigia"
+  },
+  {
+   "mapCid": "bafkr4ifmnqa3ymxmwr3sln3iqcj4vcm5brqfujkiv474jux57h2nzxfvhu",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 9007199254740991,
+   "descriptor": "a4617601636d6170d82a58250001551e20ac6c01bc32ecb47725b7688093ca899d0c605a2548af3fc4d2fdf9f4dcdcb53d646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f52676d617053697a651b001fffffffffffff",
+   "descriptorSha256": "30553df1da26e73f51857bca54c86129c630e370fda6f9a01a9912c242e249e1",
+   "anchor": "bafyreibqku67dwrg447vdbl3zjkmqyjjyyyog4h5u342aguzclbefysj4e"
+  },
+  {
+   "mapCid": "bafkr4ifmnqa3ymxmwr3sln3iqcj4vcm5brqfujkiv474jux57h2nzxfvhu",
+   "unixfsCid": "bafybeicl6ujc6ncfktctxxroxognfn7d2fqavvrryoc2lv6m4i6hpbkfti",
+   "topMetaEntries": 1,
+   "topMetaSha256": "64bc516066d7fa3a71904f3a31fca251f89a34eb8e0c527468ee67a2baac0816",
+   "mapSize": 9007199254740991,
+   "descriptor": "a5617601636d6170d82a58250001551e20ac6c01bc32ecb47725b7688093ca899d0c605a2548af3fc4d2fdf9f4dcdcb53d646d657461582900000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f5266756e69786673d82a582500017012204bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a676d617053697a651b001fffffffffffff",
+   "descriptorSha256": "0a37e48310bf64cb24f5f6f91c500a87f6a415c258f9bd583cc345d6d61b7748",
+   "anchor": "bafyreiakg7sigef7mtfsj5pw7eofacuh62sblqsy7g6vqpgdixlnmg3xja"
+  },
+  {
+   "mapCid": "bafkr4iawcoysybnjvl25u3k72ds5odlwfjpf3hiri43yocnx77qkyg5bce",
+   "topMetaEntries": 5,
+   "topMetaSha256": "4578ed2e8883fdf62a7dc240b7a4a6ab1e2047519555e3fae1194b55d5d575d9",
+   "mapSize": 24,
+   "descriptor": "a4617601636d6170d82a58250001551e201613b12c05a9aaf5da6d5fd0e5d70d762a5e5d9d1147378709b7ffe0ac1ba111646d65746158cd00000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f52000000000001000000c8e01c5fb00e11bd52fbb61678822a783a8c41edca5007eb127245832c2a2b510000000000010000004c7490e33dae0c0421b176b6ad28daa63296712d8b5dcf542afd70d457895588000000000001000000e2e40b395f285421c8fc700a19f528d6bd26f27f8849a50d99d7019a2f6c5c440000000000010000004321d32242dc3db29cffff009d82cad62e689e7066aff3b4169ee89d17640043676d617053697a651818",
+   "descriptorSha256": "f134e3db15b7e6da737b9c5bd48224868f4d75db885cdd150442cbc27944482f",
+   "anchor": "bafyreihrgtr5wfnx43nhg644lpkiejegr5gxlw4iltorkbcczpbhsrcif4"
+  },
+  {
+   "mapCid": "bafkr4iawcoysybnjvl25u3k72ds5odlwfjpf3hiri43yocnx77qkyg5bce",
+   "unixfsCid": "bafybeihhponjv2pdbmg33nxvccrgj34546avahl3nojk5cplawofvn2d3m",
+   "topMetaEntries": 5,
+   "topMetaSha256": "4578ed2e8883fdf62a7dc240b7a4a6ab1e2047519555e3fae1194b55d5d575d9",
+   "mapSize": 24,
+   "descriptor": "a5617601636d6170d82a58250001551e201613b12c05a9aaf5da6d5fd0e5d70d762a5e5d9d1147378709b7ffe0ac1ba111646d65746158cd00000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f52000000000001000000c8e01c5fb00e11bd52fbb61678822a783a8c41edca5007eb127245832c2a2b510000000000010000004c7490e33dae0c0421b176b6ad28daa63296712d8b5dcf542afd70d457895588000000000001000000e2e40b395f285421c8fc700a19f528d6bd26f27f8849a50d99d7019a2f6c5c440000000000010000004321d32242dc3db29cffff009d82cad62e689e7066aff3b4169ee89d1764004366756e69786673d82a58250001701220e77b9a9ae9e30b0dbdb6f510a264ef9de781501d7b6b92ae89eb059c5ab743db676d617053697a651818",
+   "descriptorSha256": "de96b84b2e4f7e5b880945aa8946cf1613a9bfe5e072b25ae306a9a9c6f0bb76",
+   "anchor": "bafyreig6s24ewlsppznyqckfvkeuntywcou37zpaokzfvyygvgu4n4f3oy"
+  },
+  {
+   "mapCid": "bafkr4ibjq5zzayeqpk3nz6t4sh4grtkpx2kg2sekze5wieqzslsxi6xpci",
+   "topMetaEntries": 7,
+   "topMetaSha256": "a9f7e0b1a1c84ad5b36de6371179cc43af3404a1f1a6c019ca73e44e16bb18a9",
+   "mapSize": 24,
+   "descriptor": "a4617601636d6170d82a58250001551e202987739060907ab6dcfa7c91f868cd4fbe946d488ac93b64121992e5747aef12646d65746159011f00000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f52000000000001000000c8e01c5fb00e11bd52fbb61678822a783a8c41edca5007eb127245832c2a2b510000000000010000004c7490e33dae0c0421b176b6ad28daa63296712d8b5dcf542afd70d457895588000000000001000000e2e40b395f285421c8fc700a19f528d6bd26f27f8849a50d99d7019a2f6c5c440000000000010000004321d32242dc3db29cffff009d82cad62e689e7066aff3b4169ee89d17640043000000000001000000a682422ab9488d5c2d801038f6c31617287d19429fb3502cf6e99a8b79a364900000000000010000008310da8f3ae8c968f301b6115a525afe66086afd911725693a3765a4286e7991676d617053697a651818",
+   "descriptorSha256": "73c8b01a64cebc0ad003be6ddf64ec54607ef51dfd5d0aa6c79926ed12d0e7b4",
+   "anchor": "bafyreidtzcybuzgoxqfnaa56nxpwj3cumb7pkhp5lufknr4ze3wrfuhhwq"
+  },
+  {
+   "mapCid": "bafkr4ibjq5zzayeqpk3nz6t4sh4grtkpx2kg2sekze5wieqzslsxi6xpci",
+   "unixfsCid": "bafybeigkgwdvr5wspzwpiutssn4xpj2i7wedshnwphhnu7ohx4pqaxxipe",
+   "topMetaEntries": 7,
+   "topMetaSha256": "a9f7e0b1a1c84ad5b36de6371179cc43af3404a1f1a6c019ca73e44e16bb18a9",
+   "mapSize": 24,
+   "descriptor": "a5617601636d6170d82a58250001551e202987739060907ab6dcfa7c91f868cd4fbe946d488ac93b64121992e5747aef12646d65746159011f00000000000100000050ae5b142a0f31db537ba060ba07e46fafe1ec960ebec7b6f08f03dafe774f52000000000001000000c8e01c5fb00e11bd52fbb61678822a783a8c41edca5007eb127245832c2a2b510000000000010000004c7490e33dae0c0421b176b6ad28daa63296712d8b5dcf542afd70d457895588000000000001000000e2e40b395f285421c8fc700a19f528d6bd26f27f8849a50d99d7019a2f6c5c440000000000010000004321d32242dc3db29cffff009d82cad62e689e7066aff3b4169ee89d17640043000000000001000000a682422ab9488d5c2d801038f6c31617287d19429fb3502cf6e99a8b79a364900000000000010000008310da8f3ae8c968f301b6115a525afe66086afd911725693a3765a4286e799166756e69786673d82a58250001701220ca358758f6d27e6cf45272937977a748fd88391db679ceda7dc7bf1f005ee879676d617053697a651818",
+   "descriptorSha256": "b8cee8394c4d71d64571a06bcd5e5c464c35987d3d12e5b19f412b82d1ed7f1d",
+   "anchor": "bafyreifyz3udstcnohlek4nanpgv4xcgjq2zq7j5cls3dh2bfobnd3l7du"
+  },
+  {
+   "mapCid": "bafkr4ib22tmv7urwbviiogfrflq7sszcm2eeqbheif6cdfpogiddwejcpu",
+   "topMetaEntries": 1598,
+   "topMetaSha256": "d5f7495511e294f6c0a591309f74aa54a61c0b46874b4531e1ecb30e3fd137eb",
+   "mapSize": 24,
+   "descriptorSha256": "e49b4ffb73d4b5f0a00585807c9dc8084b30ec508a6d43392fccab533b0a6fe9",
+   "anchor": "bafyreihetnh7w46uwxykabmfqb6j3saijmyoyueknvbtsl6mvnjtwctp5e"
+  },
+  {
+   "mapCid": "bafkr4ib22tmv7urwbviiogfrflq7sszcm2eeqbheif6cdfpogiddwejcpu",
+   "unixfsCid": "bafybeidcwz7b62c3p7xvcebaaxo52j3xjpr75y4miklfyu5kwa25bnvsee",
+   "topMetaEntries": 1598,
+   "topMetaSha256": "d5f7495511e294f6c0a591309f74aa54a61c0b46874b4531e1ecb30e3fd137eb",
+   "mapSize": 24,
+   "descriptorSha256": "94a0799df0c81e3358bbdb01d97d478281b2d9b12814b658a2992f0693bdee52",
+   "anchor": "bafyreieuub4z34gidyzvro63ahmx2r4cqgzntmjics3friuzf4djhppoki"
+  }
+ ]
+}

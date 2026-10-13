@@ -15,10 +15,16 @@ import { rangeFetch, type HostOptions } from './helpers/host.ts';
 
 // A LeafIndex driven by a cut list: cold until leavesFor runs (like a real
 // multi-level descent), warm after. Never fetches; leaves come from the cuts.
+// `shardsSent` gates the lookup's "shards requested" signal; `signals: false`
+// models a lookup that never sends it.
 class FakeIndex implements LeafIndex {
   #leaves: Leaf[] = [];
   #resolved = false;
-  constructor(data: Uint8Array, cuts: number[]) {
+  #shardsSent: Promise<void>;
+  #signals: boolean;
+  constructor(data: Uint8Array, cuts: number[], { shardsSent = Promise.resolve(), signals = true } = {}) {
+    this.#shardsSent = shardsSent;
+    this.#signals = signals;
     let offset = 0;
     for (const length of cuts) {
       this.#leaves.push({ offset, length, digest: sha256Hex(data.subarray(offset, offset + length)) });
@@ -28,7 +34,9 @@ class FakeIndex implements LeafIndex {
   #covering(start: number, end: number): Leaf[] {
     return this.#leaves.filter((l) => l.offset + l.length > start && l.offset < end);
   }
-  async leavesFor(start: number, end: number): Promise<Leaf[]> {
+  async leavesFor(start: number, end: number, { onShardsRequested }: { onShardsRequested?: () => void } = {}): Promise<Leaf[]> {
+    await this.#shardsSent;
+    if (this.#signals) onShardsRequested?.();
     this.#resolved = true;
     return this.#covering(start, end);
   }
@@ -39,9 +47,9 @@ class FakeIndex implements LeafIndex {
 
 const PATH = 'map.bin';
 
-function open(data: Uint8Array, cuts: number[], opts: HostOptions = {}) {
+function open(data: Uint8Array, cuts: number[], opts: HostOptions = {}, index: LeafIndex = new FakeIndex(data, cuts)) {
   const store = new VerifiedStore([new RangeSource('.', { fetchFn: rangeFetch(new Map([[PATH, data]]), opts) })]);
-  return { reader: new RangedReader(store, new FakeIndex(data, cuts), PATH, data.length), store };
+  return { reader: new RangedReader(store, index, PATH, data.length), store };
 }
 
 const readsAgree = async (reader: RangedReader, data: Uint8Array) => {
@@ -93,6 +101,29 @@ test('a cold leaf-aligned read races the tile fetch against the descent', async 
   ranged.length = 0;
   await reader.read(100, 900);
   assert.deepEqual(ranged, [], 'warm repeat: no request');
+});
+
+test('a cold read speculates only once the lookup has sent its shard requests', async () => {
+  const data = deterministicBytes(3000, 33);
+  const ranged: string[] = [];
+  let sendShards!: () => void;
+  const index = new FakeIndex(data, [100, 900, 2000], { shardsSent: new Promise((resolve) => (sendShards = resolve)) });
+  const { reader } = open(data, [100, 900, 2000], { onRequest: (_, h) => h?.Range && ranged.push(h.Range) }, index);
+  const read = reader.read(100, 900);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(ranged, [], 'no content request ahead of the shards');
+  sendShards();
+  assert.deepEqual(await read, new Uint8Array(data.subarray(100, 1000)));
+  assert.deepEqual(ranged, ['bytes=100-999'], 'one speculative request, adopted');
+});
+
+test('a lookup that never signals gets no speculation', async () => {
+  const data = deterministicBytes(3000, 34);
+  const ranged: string[] = [];
+  const index = new FakeIndex(data, [100, 900, 2000], { signals: false });
+  const { reader } = open(data, [100, 900, 2000], { onRequest: (_, h) => h?.Range && ranged.push(h.Range) }, index);
+  assert.deepEqual(await reader.read(0, 150), new Uint8Array(data.subarray(0, 150)));
+  assert.deepEqual(ranged, ['bytes=0-999'], 'only the verified run');
 });
 
 test('a misaligned cold read discards the speculation and fetches the run', async () => {

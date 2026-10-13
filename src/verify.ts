@@ -1,6 +1,7 @@
-// Digest verification primitives: sha2-256 only — the hash every CID and
-// proof record in a package uses. WebCrypto requires a secure context
-// (https or localhost). Digests travel as lowercase hex strings client-side.
+// Digest verification primitives: sha2-256 only — the hash of every CID and
+// proof record a client checks (a descriptor's BLAKE3 map is never checked).
+// WebCrypto requires a secure context (https or localhost). Digests travel as
+// lowercase hex strings client-side.
 
 export const DIGEST_HEX_RE = /^[0-9a-f]{64}$/;
 

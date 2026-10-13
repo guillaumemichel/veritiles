@@ -2,7 +2,7 @@
 // encode half (encodeShard/encodeMeta) serves the packer and test fixtures.
 // Every file is a plain sequence of records and must parse to exactly EOF; a
 // truncated or trailing byte rejects the whole file. Digests are raw 32-byte
-// sha2-256 outputs (the only hash in the format); every integer is
+// sha2-256 outputs (the only hash in proof files); every integer is
 // fixed-width little-endian.
 //
 //   shard file := ( u32le(relativeOffset) digest32 )+          fixed 36 B records
