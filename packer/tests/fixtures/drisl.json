@@ -1,0 +1,75 @@
+{
+ "description": "DRISL heads: encodeUint (major 0) and encodeBytesHead (major 2, at most 0xffff)",
+ "uint": [
+  {
+   "value": 0,
+   "encoded": "00"
+  },
+  {
+   "value": 1,
+   "encoded": "01"
+  },
+  {
+   "value": 23,
+   "encoded": "17"
+  },
+  {
+   "value": 24,
+   "encoded": "1818"
+  },
+  {
+   "value": 255,
+   "encoded": "18ff"
+  },
+  {
+   "value": 256,
+   "encoded": "190100"
+  },
+  {
+   "value": 65535,
+   "encoded": "19ffff"
+  },
+  {
+   "value": 65536,
+   "encoded": "1a00010000"
+  },
+  {
+   "value": 4294967295,
+   "encoded": "1affffffff"
+  },
+  {
+   "value": 4294967296,
+   "encoded": "1b0000000100000000"
+  },
+  {
+   "value": 9007199254740991,
+   "encoded": "1b001fffffffffffff"
+  }
+ ],
+ "bytesHead": [
+  {
+   "length": 0,
+   "encoded": "40"
+  },
+  {
+   "length": 23,
+   "encoded": "57"
+  },
+  {
+   "length": 24,
+   "encoded": "5818"
+  },
+  {
+   "length": 255,
+   "encoded": "58ff"
+  },
+  {
+   "length": 256,
+   "encoded": "590100"
+  },
+  {
+   "length": 65535,
+   "encoded": "59ffff"
+  }
+ ]
+}

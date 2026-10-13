@@ -16,6 +16,7 @@ import {
   decodeMeta,
   KIND_DIR,
   type Leaf,
+  type MetaEntry,
   SHARD_FILE_CAP,
   shardLeavesFor,
   shardName,
@@ -28,6 +29,9 @@ import { VerificationError } from './verify.ts';
 // Meta files are capped by the format (and the descriptor cap for the top
 // one); shard files carry the tighter format cap.
 const META_FILE_CAP = 256 * 1024;
+
+// A covering meta entry and the proof path derived for it.
+type Entry = MetaEntry & { path: string };
 
 export class ProofIndex implements LeafIndex {
   #store: VerifiedStore;
@@ -53,11 +57,18 @@ export class ProofIndex implements LeafIndex {
   }
 
   // Verified leaves, in file order, covering every leaf that overlaps
-  // [start, end).
-  async leavesFor(start: number, end: number, { signal }: { signal?: AbortSignal } = {}): Promise<Leaf[]> {
-    const out: Leaf[] = [];
-    await this.#collect('', 0, this.#fileSize, this.#topMeta, start, end, out, signal);
-    return out;
+  // [start, end). Two phases: resolve the covering metas, then request every
+  // covering shard at once and call `onShardsRequested` — a caller holding a
+  // content request until then keeps it from queueing ahead of the shards.
+  async leavesFor(
+    start: number,
+    end: number,
+    { signal, onShardsRequested }: { signal?: AbortSignal; onShardsRequested?: () => void } = {},
+  ): Promise<Leaf[]> {
+    const shards = await this.#coveringShards('', 0, this.#fileSize, this.#topMeta, start, end, signal);
+    const files = Promise.all(shards.map((s) => this.#store.fetchWhole(s.path, s.digest, SHARD_FILE_CAP, { signal })));
+    onShardsRequested?.();
+    return (await files).flatMap((bytes, i) => this.#shardLeaves(bytes, shards[i]!, start, end));
   }
 
   // Same result, synchronously, when every covering meta and shard is
@@ -79,57 +90,66 @@ export class ProofIndex implements LeafIndex {
     end: number,
     out: Leaf[],
   ): boolean {
-    const { entries, covered } = decodeMeta(metaBytes, dirStart, start, end);
-    if (covered !== dirLength) {
-      throw new VerificationError(`${label(dirPath)} covers ${covered} bytes, expected ${dirLength}`);
-    }
-    for (const entry of entries) {
-      const path = join(dirPath, shardName(entry.start));
-      if (entry.kind === KIND_DIR) {
-        const child = this.#store.getCached(entry.digest);
-        if (child === undefined) return false;
-        if (!this.#collectCached(path, entry.start, entry.length, child, start, end, out)) return false;
-        continue;
-      }
+    for (const entry of this.#entries(dirPath, dirStart, dirLength, metaBytes, start, end)) {
       const bytes = this.#store.getCached(entry.digest);
       if (bytes === undefined) return false;
-      if (!this.#validated.has(bytes)) {
-        validateShard(bytes, entry.length, path);
-        this.#validated.add(bytes);
+      if (entry.kind === KIND_DIR) {
+        if (!this.#collectCached(entry.path, entry.start, entry.length, bytes, start, end, out)) return false;
+        continue;
       }
-      out.push(...shardLeavesFor(bytes, entry.start, entry.length, start, end));
+      out.push(...this.#shardLeaves(bytes, entry, start, end));
     }
     return true;
   }
 
-  async #collect(
+  // Phase one: the shard entries covering [start, end), in file order.
+  // Sibling metas are requested together; each subtree descends as soon as
+  // its own meta arrives.
+  async #coveringShards(
     dirPath: string,
     dirStart: number,
     dirLength: number,
     metaBytes: Uint8Array,
     start: number,
     end: number,
-    out: Leaf[],
     signal: AbortSignal | undefined,
-  ): Promise<void> {
+  ): Promise<Entry[]> {
+    const entries = this.#entries(dirPath, dirStart, dirLength, metaBytes, start, end);
+    const subtrees = await Promise.all(
+      entries.map(async (entry) => {
+        if (entry.kind !== KIND_DIR) return [entry];
+        const child = await this.#store.fetchWhole(`${entry.path}/meta`, entry.digest, META_FILE_CAP, { signal });
+        return this.#coveringShards(entry.path, entry.start, entry.length, child, start, end, signal);
+      }),
+    );
+    return subtrees.flat();
+  }
+
+  // A meta's entries overlapping [start, end), named, once the meta is
+  // checked to cover exactly the range its parent committed.
+  #entries(
+    dirPath: string,
+    dirStart: number,
+    dirLength: number,
+    metaBytes: Uint8Array,
+    start: number,
+    end: number,
+  ): Entry[] {
     const { entries, covered } = decodeMeta(metaBytes, dirStart, start, end);
     if (covered !== dirLength) {
       throw new VerificationError(`${label(dirPath)} covers ${covered} bytes, expected ${dirLength}`);
     }
-    for (const entry of entries) {
-      const path = join(dirPath, shardName(entry.start));
-      if (entry.kind === KIND_DIR) {
-        const child = await this.#store.fetchWhole(`${path}/meta`, entry.digest, META_FILE_CAP, { signal });
-        await this.#collect(path, entry.start, entry.length, child, start, end, out, signal);
-        continue;
-      }
-      const bytes = await this.#store.fetchWhole(path, entry.digest, SHARD_FILE_CAP, { signal });
-      if (!this.#validated.has(bytes)) {
-        validateShard(bytes, entry.length, path);
-        this.#validated.add(bytes);
-      }
-      out.push(...shardLeavesFor(bytes, entry.start, entry.length, start, end));
+    return entries.map((entry) => ({ ...entry, path: join(dirPath, shardName(entry.start)) }));
+  }
+
+  // The overlapping leaves of a digest-verified shard; its structure is
+  // validated once per buffer.
+  #shardLeaves(bytes: Uint8Array, shard: Entry, start: number, end: number): Leaf[] {
+    if (!this.#validated.has(bytes)) {
+      validateShard(bytes, shard.length, shard.path);
+      this.#validated.add(bytes);
     }
+    return shardLeavesFor(bytes, shard.start, shard.length, start, end);
   }
 }
 

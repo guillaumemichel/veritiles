@@ -4,10 +4,140 @@ All notable changes to this project are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (pre-1.0: minor = feature, patch =
 fix).
 
-## [Unreleased]
+## [0.5.0] — Planet scale
+
+**Planet scale.** A Rust port of the packer packs files of any size — a
+130 GiB planet included — writing the same bytes as the TS packer. Packs now
+cut leaves where readers read: PMTiles archives choose their tile groups
+from the file, and fragmented MP4s get one leaf per fragment. With a client
+that sends the descriptor, the first proof piece and the first read
+together, a cold map view or video start costs little more than an
+unverified one. Breaking: a descriptor's `map` is now the file's BLAKE3
+CID, so v0.4 packs must be re-packed.
+
+### Added
+
+- **Rust packer** (`packer/`, `npm run pack:rs -- …`): a port of the
+  repository packer for files the TS packer cannot hold in memory (~2 GiB
+  and up, such as a planet-scale PMTiles). It memory-maps the input, hashes
+  in parallel, and writes the same bytes as `tools/pack.ts` — anchor, proof
+  files, CARs, stdout and stderr — enforced by a differential test
+  (`test/pack-diff.test.ts`). Local files only; its `verify` checks every
+  byte. See `packer/README.md`.
+- `npm run test:diff` runs that differential test; `npm test` no longer
+  does. CI builds the binary and fails, rather than skips, without it.
+- **`mp4` packer profile.** `--profile auto` packs a fragmented MP4 (an
+  `ftyp` box first, then a top-level `moof`) with one leaf per fragment:
+  its `moof` and `mdat`s, with any `styp`, `emsg` or `prft` boxes that open
+  it. The init section and any boxes after the last `mdat` (an `mfra`) get
+  a leaf each. A player that reads each fragment at the range its `sidx`
+  lists, as Media Source Extensions players do, downloads exactly that
+  fragment in one round trip instead of the whole 1 MiB leaves around it.
+  Verified playback then keeps pace with an unverified player: a
+  YouTube-style source (video and audio tracks) starts in 247 ms instead of
+  947 ms at 50 ms RTT and 20 Mbit/s (unverified: 265 ms), downloading
+  0.49 MB instead of 2.23 MB, and seeks in 453 ms instead of 892 ms
+  (unverified: 451 ms). Audio-only `.m4a` files qualify; a regular MP4 still
+  packs as `fixed`, and `--profile mp4` forces the profile. Once a file is
+  taken as fragmented MP4, a malformed box, such as a truncated download,
+  fails the pack.
+
+### Changed
+
+- **Breaking:** a descriptor's `map` is the file's raw BLAKE3 CID (BDASL,
+  `bafkr4i…`) instead of its sha2-256 CID. No client computes `map` — it
+  names the file, for content hints — so the packers no longer run the one
+  step that could not be parallelized: a single SHA-256 stream over the
+  whole file. The Rust packer packs a file in memory 2–3.5× faster, and a
+  file larger than RAM is now bound by the disk rather than the hash.
+  Clients reject a sha2-256 `map`, so v0.4 packs must be re-packed, and v0.4
+  clients reject v0.5 packs. Every hash a client checks — anchors, proof
+  files, leaves, assets — stays sha2-256 (WebCrypto). Hints documents accept
+  raw BLAKE3 CIDs as keys. The TS packer computes BLAKE3 with the
+  `hash-wasm` dev dependency.
+- **Faster first paint.** The client requests the descriptor, the first
+  proof shard (`0`) and the first read's range in one round trip, each
+  still verified before use, and requests the proof shards covering a read
+  (after any directory metas) before that read's speculative tile data, so
+  a shard never waits behind tile bytes. With the new tile-group default
+  below, a cold view of the Protomaps planet shows its first tile in
+  301–366 ms instead of 764–1,350 ms at 50 ms RTT and 20 Mbit/s (plain
+  PMTiles: 201–266 ms); on a terrain archive shaped like Mapterhorn's planet
+  (331 GiB, z0–z12), a cold z12 view in 358 ms instead of 1,081 ms (plain:
+  228 ms).
+- **PMTiles packs choose their tile group from the archive.** Without
+  `--tile-group`, the packers use the smallest of 16, 32 and 64 KiB whose
+  shards all fit in the descriptor's top meta, else 64 KiB, so every zoom
+  band is listed there directly whenever the archive allows it. The old
+  1 MiB default made a reader fetch a whole 1 MiB group around each tile:
+  the Protomaps planet now gets 64 KiB, and a cold view downloads 21% more
+  than plain PMTiles instead of 323% more. The budget used, chosen or
+  explicit, is printed on stderr after the `proofs:` line (`tile group:
+  65536 bytes`). An explicit `--tile-group N` (including `0`) is unchanged.
+- Fragmented MP4s packed with `--profile auto` now get the `mp4` profile and
+  new anchors; `--chunk` on such a file needs `--profile fixed`.
+- **A zoom band too large for the top meta splits into small
+  subdirectories** of at most 399 shards each (child metas of at most
+  16 KiB), each listed in the top meta, their sizes differing by at most one
+  shard: the first view into such a band waits on one small meta instead of
+  a meta of up to 256 KiB. Only when the top meta has no room for them does
+  the band become one nested subdirectory, as before.
+- Packer CLI is strict: unknown flags, flags without a value, extra
+  arguments, an unknown `--profile`, `--profile pmtiles` on a non-PMTiles
+  file (previously a silent fixed pack), `--chunk` with the pmtiles profile,
+  `--tile-group` with the fixed profile, and `--out` or `--full-car` naming
+  the input file are errors instead of being ignored. The packer also
+  refuses an `--out` directory that contains the input (`--out contains the
+  input file`) and a `--full-car` whose `<path>.tmp` is the input.
+- PMTiles directories and metadata may decompress to at most 256 MiB each
+  (larger blocks fail as `PMTiles <codec> decompression failed`), and an
+  archive may list at most 2^30 tile entries (`PMTiles has more than 2^30
+  tile entries`), so a small hostile archive cannot exhaust memory.
+- A zstd-compressed PMTiles directory or metadata block must be exactly one
+  complete zstd frame: a truncated frame, a second or skippable frame, or
+  trailing bytes now fail as `PMTiles zstd decompression failed`. Node 22
+  ignored truncation and anything after the first frame, while Node 24
+  rejects truncation, so the TS packer accepted different archives
+  depending on the Node version. One zstd compression call writes one
+  frame, so ordinary archives are unaffected.
+- The top meta keeps one slot per remaining zoom band when inlining a band,
+  so archives such as one band of 1,598 shards followed by a small band now
+  pack (the large band moves into subdirectories) instead of failing with
+  `top meta needs … entries`.
+- `--full-car`: the `<path>.tmp` file is opened before the proof files are
+  written; an open failure is still reported after them. Any later failure
+  removes `<path>.tmp` before the error is reported.
+- The packer also refuses an existing output that is the input file itself,
+  reached through a symlink or a hard link (compared by device and inode):
+  a proof file (`--out contains the input file`) or `<full-car>.tmp`
+  (`--full-car resolves to the input file`). Nothing is written in that
+  case, only the proof directories.
+- `pack verify` reads proof files on demand instead of loading the whole
+  `--proofs` directory, so unrelated entries (such as a dangling symlink) no
+  longer fail it.
+- PMTiles inputs must have tile lengths ≤ 0xffffffff and safe-integer tile
+  ids. Decompression and metadata JSON failures report fixed messages
+  (`PMTiles gzip decompression failed`, `PMTiles metadata is not valid
+  JSON`, …) instead of library text.
+- `--full-car` writes blocks in canonical DAG post-order (children left to
+  right, then the parent; each block once), replacing the importer's
+  internal put order. Only files over 174 chunks (> 43.5 MiB) get different
+  CAR bytes; the DAG, its root CID and `ipfs dag import` results are
+  unchanged. The CAR is written to `<path>.tmp` and renamed when complete.
+- The proof directory's `root` is written last, so a present `root` means
+  every file it names exists.
+- `pack verify` prints `verify OK`, drops `--reads` (fixed at 64 spot
+  reads), and rejects a file whose length differs from the descriptor's
+  `mapSize`; a trailing byte previously passed.
 
 ### Fixed
 
+- PMTiles archives whose metadata or leaf directories come after the tile
+  data — the layout of the Protomaps planet builds — failed to pack with
+  `tile leaf at … matches no tile group`. Those sections now form a last
+  band of their own. Archives that packed before are unaffected.
+- The TS packer failed with a stack overflow (`Maximum call stack size
+  exceeded`) on a PMTiles leaf directory of more than ~125,000 entries.
 - `pack assets` inlined every file up to the 8 MiB CAR section cap, so a
   typical directory's "proof" carried a complete second copy of the content
   (a 6.2 MB glyph directory emitted a 6.28 MB CAR for a 32 KB manifest),
@@ -24,6 +154,32 @@ fix).
   generator previously used a test helper), and `npm test` now runs
   `examples/build-assets.ts`, whose drift guard keeps page and fixture in
   sync.
+- `pack assets` wrote one CAR section per file, so identical files produced
+  duplicate sections and the client rejected the bundle. Each distinct
+  block is now written once, and the 256 KiB inline budget counts unique
+  bytes.
+- `pack assets` took the extension from the whole path, so `dir.v2/LICENSE`
+  got `v2/license`; it now comes from the file name. Names that are not
+  valid UTF-8 are errors.
+- `--chunk 0` looped forever; it is now an error, as is a size beyond 2^53.
+- Large inputs no longer fail to pack: a top meta with over 1,598 entries
+  (e.g. `--chunk 256KiB` on ~760 GB, or a planet with `--tile-group 0`)
+  now moves the band into subdirectories listed in the top meta, and a
+  shard closes early when a leaf offset would overflow its u32 relative
+  offset (large `--chunk` on large files).
+
+### Notes
+
+- Every ranged-file anchor changes, because `root` carries the BLAKE3 `map`.
+  For every file that packed before, all other proof files are
+  byte-identical to v0.4, except PMTiles archives packed with the default
+  `--tile-group` (now chosen per file) and files with a band of more than
+  1,598 shards (now split). Full CAR bytes differ only for files over 174
+  chunks, and bundle CARs only for directories with duplicate files. Asset
+  anchors are unaffected, except that a bundle anchor changes when `--type
+  .=…` now types a dotless file under a dotted directory.
+- A page pinned to `veritiles@0.4` keeps the v0.4 client, which reads only
+  v0.4 packs: re-pack its data before moving it to `@0.5`.
 
 ## [0.4.0] — Routing hints
 
@@ -163,6 +319,7 @@ anchor.
   with failover across mirrors, tamper bans, and verified-byte caching.
   Examples for MapLibre GL, Leaflet, and OpenLayers.
 
+[0.5.0]: https://github.com/guillaumemichel/veritiles/releases/tag/v0.5.0
 [0.4.0]: https://github.com/guillaumemichel/veritiles/releases/tag/v0.4.0
 [0.3.1]: https://github.com/guillaumemichel/veritiles/releases/tag/v0.3.1
 [0.3.0]: https://github.com/guillaumemichel/veritiles/releases/tag/v0.3.0

@@ -1,25 +1,26 @@
 // The veritiles packer is a repository development tool. It is not included
 // in the published library package.
-// Turns a file into a verified pair: its raw whole-file CID and a dag-cbor
+// Turns a file into a verified pair: its raw whole-file BLAKE3 CID and a dag-cbor
 // descriptor plus a meta/shard tree of static files (PLAN-shards §3).
 // `verify` opens a real VerifiedFile over the emitted package and spot-reads
 // random ranges.
 //
 //   npm run pack -- map.pmtiles                      → ./map.pmtiles.proofs/
 //   npm run pack -- map.pmtiles --tile-group 1MiB
-//   npm run pack -- verify --cid b… --file <path> --proofs <dir> [--reads 64]
+//   npm run pack -- verify --cid b… --file <path> --proofs <dir>
 
 import { CarWriter } from '@ipld/car';
+import * as dagPb from '@ipld/dag-pb';
 import { MemoryBlockstore } from 'blockstore-core/memory';
 import { importer } from 'ipfs-unixfs-importer';
 import { fixedSize } from 'ipfs-unixfs-importer/chunker';
 import { CID } from 'multiformats/cid';
 import * as Digest from 'multiformats/hashes/digest';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { brotliDecompressSync, gunzipSync } from 'node:zlib';
-import * as zlib from 'node:zlib';
+import { mkdir, open, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve, sep } from 'node:path';
+import { brotliDecompressSync, gunzipSync, zstdDecompressSync } from 'node:zlib';
+import { createBLAKE3 } from 'hash-wasm';
 import { bytesToHeader, Compression, SharedPromiseCache, type Entry, type Header, type Source } from 'pmtiles';
 
 import { encodeDescriptor } from '../src/descriptor.ts';
@@ -38,14 +39,33 @@ import { VerifiedFile } from '../src/verified-file.ts';
 
 const RAW_CODE = 0x55;
 const SHA2_256 = 0x12;
+const BLAKE3 = 0x1e; // the map only: no client recomputes it (SPEC §2.1)
 const DAG_CBOR_CODE = 0x71;
+const DAG_PB_CODE = 0x70;
 const META_FILE_CAP = 256 * 1024;
 const META_MAX_ENTRIES = Math.floor(META_FILE_CAP / META_RECORD_SIZE);
+// The top meta is a descriptor byte string, whose DRISL head carries at most
+// a 2-byte length.
+const TOP_META_MAX_ENTRIES = Math.floor(0xffff / META_RECORD_SIZE);
+// A band too large for the top meta splits into directories of at most this
+// many shards: 399 records fit in 16 KiB, so the first view into the band
+// waits on a small meta, while the top meta grows by only a few entries.
+const SUB_META_MAX_ENTRIES = 399;
+const MAX_REL_OFFSET = 0xffffffff; // shard records hold u32 relative offsets
 const DEFAULT_CHUNK = 1 << 20; // 1 MiB — the `fixed` profile default
-const DEFAULT_TILE_GROUP = 1 << 20; // 1 MiB — the `pmtiles` profile default
+// The `pmtiles` profile's default tile group is the smallest of these that
+// keeps every shard in the top meta (choosePmtilesTileGroup): a reader then
+// reaches any shard from the descriptor alone, while small groups keep the
+// bytes fetched per tile close to the tile. Larger groups would keep more
+// archives flat but fetch more unwanted bytes, so the choice stops at 64 KiB.
+const TILE_GROUP_CANDIDATES = [16 * 1024, 32 * 1024, 64 * 1024];
 const PMTILES_HEADER_SIZE = 127;
 const PMTILES_PROBE = 16384;
 const PMTILES_MAGIC = Uint8Array.from([0x50, 0x4d, 0x54, 0x69, 0x6c, 0x65, 0x73]);
+// Bounds memory against decompression bombs and entry amplification.
+const PMTILES_BLOCK_CAP = 256 * 1024 * 1024;
+const PMTILES_MAX_TILE_ENTRIES = 2 ** 30;
+const ZSTD_MAGIC = 0xfd2fb528;
 
 export interface RawLeaf {
   offset: number;
@@ -61,7 +81,7 @@ export interface ProofFile {
 export interface Packed {
   /** The veritiles anchor: CIDv1(dag-cbor, sha2-256(descriptor)). */
   anchor: string;
-  /** The content's raw whole-file CID. */
+  /** The content's raw whole-file BLAKE3 CID. */
   mapCid: string;
   /** Optional standard UnixFS root for external IPFS pinning. */
   unixfsCid?: string;
@@ -73,10 +93,16 @@ export interface Packed {
   fullCar?: Uint8Array;
   /** The byte lengths emitted by a content-aware profile, when applicable. */
   cuts?: number[];
+  /** The `pmtiles` profile's tile group budget, chosen or explicit. */
+  tileGroupBytes?: number;
 }
 
 export interface PmtilesOptions {
-  /** Maximum bytes in one tile-data leaf. Defaults to 1 MiB. Use 0 for one tile per leaf. */
+  /**
+   * Maximum bytes in one tile-data leaf. Defaults to the smallest of 16, 32
+   * and 64 KiB that keeps every shard in the top meta, else 64 KiB. Use 0
+   * for one tile per leaf.
+   */
   tileGroupBytes?: number;
   /** Alias for the CLI's `--tile-group` option. */
   tileGroup?: number;
@@ -101,38 +127,90 @@ export interface ParsedPmtiles {
 // byte-identical to kubo `ipfs add --cid-version 1 --chunker size-N`.
 export async function packFixed(bytes: Uint8Array, opts: { chunkSize?: number; unixfs?: boolean } = {}): Promise<Packed> {
   const chunkSize = opts.chunkSize ?? DEFAULT_CHUNK;
+  if (!Number.isSafeInteger(chunkSize) || chunkSize <= 0) throw new Error(`bad chunk size: ${chunkSize}`);
   return packWithChunker(bytes, fixedSize({ chunkSize }), { unixfs: opts.unixfs });
 }
 
 /** Pack a PMTiles v3 archive using the profile from PLAN-shards §3 (zoom-shaped). */
 export async function packPmtiles(bytes: Uint8Array, opts: PmtilesOptions = {}): Promise<Packed> {
   const parsed = await parsePmtiles(bytes);
-  const tileGroupBytes = opts.tileGroupBytes ?? opts.tileGroup ?? DEFAULT_TILE_GROUP;
-  if (!Number.isSafeInteger(tileGroupBytes) || tileGroupBytes < 0) {
-    throw new Error(`bad tile grouping budget: ${tileGroupBytes}`);
-  }
+  const tileGroupBytes = tileGroupBudget(parsed, bytes.length, opts);
   const groups = groupedTileRanges(parsed.tileRanges, tileGroupBytes);
-  const cuts = cutLengths(pmtilesCutPoints(bytes, parsed, groups));
-  return packWithChunker(bytes, cutChunker(cuts), {
+  const cuts = cutLengths(pmtilesCutPoints(bytes.length, parsed, groups));
+  const packed = await packWithChunker(bytes, cutChunker(cuts), {
     cuts,
     unixfs: opts.unixfs,
-    bands: (leaves) => pmtilesBands(leaves, parsed.header.tileDataOffset, groups),
+    bands: (leaves) => pmtilesBands(leaves, parsed.header, groups),
   });
+  return { ...packed, tileGroupBytes };
 }
 
-export type PackProfile = 'auto' | 'fixed' | 'pmtiles';
+// An explicit budget is checked; without one, it is chosen from the archive.
+function tileGroupBudget(parsed: ParsedPmtiles, fileLength: number, opts: PmtilesOptions): number {
+  const budget = opts.tileGroupBytes ?? opts.tileGroup;
+  if (budget === undefined) return choosePmtilesTileGroup(parsed, fileLength);
+  if (!Number.isSafeInteger(budget) || budget < 0) throw new Error(`bad tile grouping budget: ${budget}`);
+  return budget;
+}
+
+/**
+ * The default tile group for a parsed archive: the first of
+ * TILE_GROUP_CANDIDATES whose shards all fit in the top meta, so that every
+ * band is inlined there; the largest when none does. It counts shards and
+ * hashes nothing. `topMaxEntries` is a test hook.
+ */
+export function choosePmtilesTileGroup(
+  parsed: ParsedPmtiles,
+  fileLength: number,
+  { topMaxEntries = TOP_META_MAX_ENTRIES }: { topMaxEntries?: number } = {},
+): number {
+  const flat = TILE_GROUP_CANDIDATES.find((budget) => shardTotal(parsed, fileLength, budget) <= topMaxEntries);
+  return flat ?? TILE_GROUP_CANDIDATES.at(-1)!;
+}
+
+// buildProofTree inlines every band exactly when the shards of all bands fit
+// in the top meta together: each band has a shard, so the slots kept for
+// later bands are then free, and no band can outgrow a meta (the top meta's
+// 1,598 entries are fewer than a meta's 6,393).
+function shardTotal(parsed: ParsedPmtiles, fileLength: number, budget: number): number {
+  const groups = groupedTileRanges(parsed.tileRanges, budget);
+  // A leaf starts at every cut point but the last, the end of the file.
+  const leaves = pmtilesCutPoints(fileLength, parsed, groups).slice(0, -1).map((offset) => ({ offset }));
+  return pmtilesBands(leaves, parsed.header, groups).reduce((total, band) => total + shardRanges(band).length, 0);
+}
+
+/** Pack a fragmented MP4: one leaf per fragment, after one for the init section. */
+export async function packMp4(bytes: Uint8Array, opts: { unixfs?: boolean } = {}): Promise<Packed> {
+  const cuts = mp4Cuts(bytes);
+  return packWithChunker(bytes, cutChunker(cuts), { cuts, unixfs: opts.unixfs });
+}
+
+const PROFILES = ['auto', 'fixed', 'pmtiles', 'mp4'] as const;
+export type PackProfile = (typeof PROFILES)[number];
 
 export interface PackOptions extends PmtilesOptions {
   profile?: PackProfile;
   chunkSize?: number;
 }
 
-/** Select the PMTiles profile by magic/version, unless the caller overrides it. */
+/** Select the profile by content — PMTiles v3, then fragmented MP4 — unless the caller overrides it. */
 export async function pack(bytes: Uint8Array, opts: PackOptions = {}): Promise<Packed> {
-  if (opts.profile === 'fixed' || !isPmtilesV3(bytes)) {
-    return packFixed(bytes, { chunkSize: opts.chunkSize, unixfs: opts.unixfs });
+  const requested = opts.profile ?? 'auto';
+  if (!(PROFILES as readonly string[]).includes(requested)) throw new Error(`unknown profile: ${requested}`);
+  const profile = requested === 'auto' ? detectProfile(bytes) : requested;
+  // An option the chosen profile ignores is a mistake, not a no-op.
+  if (profile !== 'fixed' && opts.chunkSize !== undefined) throw new Error('--chunk applies only to the fixed profile');
+  if (profile !== 'pmtiles' && (opts.tileGroupBytes ?? opts.tileGroup) !== undefined) {
+    throw new Error('--tile-group applies only to the pmtiles profile');
   }
-  return packPmtiles(bytes, opts);
+  if (profile === 'pmtiles') return packPmtiles(bytes, opts);
+  if (profile === 'mp4') return packMp4(bytes, { unixfs: opts.unixfs });
+  return packFixed(bytes, { chunkSize: opts.chunkSize, unixfs: opts.unixfs });
+}
+
+function detectProfile(bytes: Uint8Array): Exclude<PackProfile, 'auto'> {
+  if (isPmtilesV3(bytes)) return 'pmtiles';
+  return isFragmentedMp4(bytes) ? 'mp4' : 'fixed';
 }
 
 async function packWithChunker(
@@ -148,7 +226,7 @@ async function packWithChunker(
     offset += chunk.length;
   }
   if (offset !== bytes.length) throw new Error('chunker did not cover input');
-  const mapCid = CID.createV1(RAW_CODE, Digest.create(SHA2_256, sha256Bytes(bytes)));
+  const mapCid = CID.createV1(RAW_CODE, Digest.create(BLAKE3, (await createBLAKE3()).update(bytes).digest('binary')));
   const unixfs = opts.unixfs ? await importUnixfs(bytes) : undefined;
   const bands = opts.bands ? opts.bands(leaves) : [leaves];
   const tree = buildProofTree(bands);
@@ -162,8 +240,10 @@ async function packWithChunker(
     throw new Error(`descriptor exceeds the ${DESCRIPTOR_CAP}-byte cap — split the proof tree deeper`);
   }
   const anchor = CID.createV1(DAG_CBOR_CODE, Digest.create(SHA2_256, sha256Bytes(descriptor))).toString();
-  const proofs = new Map<string, Uint8Array>([['root', descriptor]]);
-  for (const file of tree.files) proofs.set(file.path, file.content);
+  // `root` comes last: a reader that finds it can trust every file it names
+  // was written first.
+  const proofs = new Map<string, Uint8Array>(tree.files.map((file) => [file.path, file.content]));
+  proofs.set('root', descriptor);
   return {
     anchor,
     mapCid: mapCid.toString(),
@@ -175,7 +255,7 @@ async function packWithChunker(
   };
 }
 
-class RecordingBlockstore extends MemoryBlockstore {
+export class RecordingBlockstore extends MemoryBlockstore {
   recorded = new Map<string, { cid: CID; bytes: Uint8Array }>();
 
   override async put(cid: CID, bytes: Uint8Array): Promise<CID> {
@@ -195,7 +275,26 @@ async function importUnixfs(bytes: Uint8Array): Promise<{ root: CID; blocks: { c
     chunker: fixedSize({ chunkSize: 262144 }),
   })) root = entry.cid;
   if (root === undefined) throw new Error('UnixFS importer produced no root');
-  return { root, blocks: [...blockstore.recorded.values()] };
+  return { root, blocks: postOrder(root, blockstore.recorded) };
+}
+
+// Canonical full-CAR order (SPEC §7): DAG post-order — children left to
+// right, then the parent — each block once, at its first occurrence. Unlike
+// the importer's put order it is reproducible by a one-pass streaming writer.
+export function postOrder<B extends { cid: CID; bytes: Uint8Array }>(root: CID, blocks: Map<string, B>): B[] {
+  const ordered: B[] = [];
+  const seen = new Set<string>();
+  const visit = (cid: CID): void => {
+    const key = cid.toString();
+    if (seen.has(key)) return;
+    seen.add(key);
+    const block = blocks.get(key);
+    if (block === undefined) throw new Error(`UnixFS block ${key} is missing`);
+    if (cid.code === DAG_PB_CODE) for (const link of dagPb.decode(block.bytes).Links) visit(link.Hash);
+    ordered.push(block);
+  };
+  visit(root);
+  return ordered;
 }
 
 async function writeCar(root: CID, blocks: { cid: CID; bytes: Uint8Array }[]): Promise<Uint8Array> {
@@ -222,49 +321,94 @@ interface ShardFile {
 }
 
 // Bands are consecutive leaf runs (zoom bands, or one band for the fixed
-// profile). A small band lists its shards directly in the top meta; a band
-// with more shards than a meta can hold becomes a subdirectory with its own
-// meta tree, so the top meta — and thereby the descriptor — stays small.
+// profile), placed in the top meta in order while its running total fits the
+// limit with one slot kept for each later band. A small band lists its
+// shards there directly. A larger one splits into subdirectories of at most
+// subMetaMaxEntries shards, each listed there, so every shard is one small
+// meta away from the descriptor. When those do not fit either, the band
+// becomes one subdirectory with its own meta tree. Either way the top meta —
+// and thereby the descriptor — stays small.
 export function buildProofTree(
   bands: RawLeaf[][],
-  { metaMaxEntries = META_MAX_ENTRIES }: { metaMaxEntries?: number } = {},
+  {
+    metaMaxEntries = META_MAX_ENTRIES,
+    topMaxEntries = TOP_META_MAX_ENTRIES,
+    subMetaMaxEntries = SUB_META_MAX_ENTRIES,
+  }: { metaMaxEntries?: number; topMaxEntries?: number; subMetaMaxEntries?: number } = {},
 ): { files: ProofFile[]; topMeta: Uint8Array } {
   const files: ProofFile[] = [];
   const entries: { kind: number; length: number; digest: Uint8Array }[] = [];
+  const subMax = Math.min(subMetaMaxEntries, metaMaxEntries);
+  let laterBands = bands.filter((band) => band.length > 0).length;
   for (const band of bands) {
     if (band.length === 0) continue;
+    laterBands--;
     const shards = shardGroups(band);
-    if (shards.length <= metaMaxEntries) {
+    if (shards.length <= metaMaxEntries && entries.length + shards.length + laterBands <= topMaxEntries) {
       for (const shard of shards) {
         files.push({ path: shardName(shard.start), content: shard.content });
         entries.push({ kind: KIND_SHARD, length: shard.length, digest: sha256Bytes(shard.content) });
       }
       continue;
     }
-    const name = shardName(shards[0]!.start);
-    const meta = emitDir(shards, `${name}/`, files, metaMaxEntries);
-    files.push({ path: `${name}/meta`, content: meta });
-    entries.push({
-      kind: KIND_DIR,
-      length: shards.reduce((n, s) => n + s.length, 0),
-      digest: sha256Bytes(meta),
-    });
+    const dirs = Math.ceil(shards.length / subMax);
+    const split = entries.length + dirs + laterBands <= topMaxEntries;
+    for (const dir of splitEvenly(shards, split ? dirs : 1)) {
+      const name = shardName(dir[0]!.start);
+      const meta = emitDir(dir, `${name}/`, files, metaMaxEntries);
+      files.push({ path: `${name}/meta`, content: meta });
+      entries.push({
+        kind: KIND_DIR,
+        length: dir.reduce((n, s) => n + s.length, 0),
+        digest: sha256Bytes(meta),
+      });
+    }
+  }
+  if (entries.length > topMaxEntries) {
+    throw new Error(`top meta needs ${entries.length} entries, over the ${topMaxEntries} limit`);
   }
   return { files, topMeta: encodeMeta(entries) };
 }
 
-function shardGroups(leaves: RawLeaf[]): ShardFile[] {
-  const shards: ShardFile[] = [];
-  for (let i = 0; i < leaves.length; i += MAX_SHARD_RECORDS) {
-    const group = leaves.slice(i, i + MAX_SHARD_RECORDS);
-    const start = group[0]!.offset;
-    shards.push({
-      start,
-      length: group.reduce((n, l) => n + l.length, 0),
-      content: encodeShard(group, start),
-    });
+// `items` cut into `count` consecutive runs whose sizes differ by at most
+// one: with q = floor(n / count) and r = n mod count, the first r runs hold
+// q + 1 items and the others q.
+function splitEvenly<T>(items: T[], count: number): T[][] {
+  const size = Math.floor(items.length / count);
+  const extra = items.length % count;
+  const runs: T[][] = [];
+  for (let i = 0, start = 0; i < count; i++) {
+    const end = start + size + (i < extra ? 1 : 0);
+    runs.push(items.slice(start, end));
+    start = end;
   }
-  return shards;
+  return runs;
+}
+
+function shardGroups(leaves: RawLeaf[]): ShardFile[] {
+  return shardRanges(leaves).map(([first, end]) => {
+    const group = leaves.slice(first, end);
+    const start = group[0]!.offset;
+    return { start, length: group.reduce((n, l) => n + l.length, 0), content: encodeShard(group, start) };
+  });
+}
+
+// Each shard's [first, end) leaf indices. A shard closes at the record cap,
+// or early when the next leaf's offset relative to the shard start would not
+// fit u32.
+function shardRanges(leaves: { offset: number }[]): [number, number][] {
+  const ranges: [number, number][] = [];
+  let first = 0;
+  for (let i = 1; i <= leaves.length; i++) {
+    if (i < leaves.length && fitsShard(leaves, first, i)) continue;
+    ranges.push([first, i]);
+    first = i;
+  }
+  return ranges;
+}
+
+function fitsShard(leaves: { offset: number }[], first: number, i: number): boolean {
+  return i - first < MAX_SHARD_RECORDS && leaves[i]!.offset - leaves[first]!.offset <= MAX_REL_OFFSET;
 }
 
 // Left-shallow nesting (v0.2.0 shape): earliest shards stay at the top, the
@@ -299,22 +443,23 @@ function emitDir(shards: ShardFile[], prefix: string, files: ProofFile[], maxEnt
 }
 
 // Zoom bands for the PMTiles profile: head leaves (before tile data) form
-// band zero; tile leaves form maximal consecutive same-zoom runs, so the
-// top meta reads [head shards, z-lo subtree, …, z-max subtree]. A leaf is
-// matched to the group COVERING its start — the 16 KiB probe cut can split
-// a group, leaving a leaf that starts mid-group.
-function pmtilesBands(
-  leaves: RawLeaf[],
-  tileDataOffset: number,
+// band zero; tile leaves form maximal consecutive same-zoom runs; sections
+// after the tile data (the planet's metadata and leaf directories) form a
+// last band. The top meta reads [head shards, z-lo subtree, …, z-max subtree,
+// tail]. A leaf is matched to the group COVERING its start — the 16 KiB
+// probe cut can split a group, leaving a leaf that starts mid-group.
+function pmtilesBands<T extends { offset: number }>(
+  leaves: T[],
+  { tileDataOffset, tileDataLength }: Header,
   groups: { offset: number; length: number; tileId: number }[],
-): RawLeaf[][] {
-  const bands: RawLeaf[][] = [];
-  let band: RawLeaf[] = [];
+): T[][] {
+  const bands: T[][] = [];
+  let band: T[] = [];
   let bandZoom = -1;
   let gi = 0;
   for (const leaf of leaves) {
     let zoom = -1;
-    if (leaf.offset >= tileDataOffset) {
+    if (leaf.offset >= tileDataOffset && leaf.offset < tileDataOffset + (tileDataLength ?? 0)) {
       while (gi < groups.length && groups[gi]!.offset + groups[gi]!.length <= leaf.offset) gi++;
       const group = groups[gi];
       if (group === undefined || leaf.offset < group.offset) {
@@ -380,17 +525,21 @@ export async function parsePmtiles(bytes: Uint8Array): Promise<ParsedPmtiles> {
         addSection(boundaries, offset, entry.length, bytes.length, 'leaf directory');
         const entries = await cache.getDirectory(source, offset, entry.length, header);
         leafDirectories.push({ offset, length: entry.length, entries });
-        tileEntries.push(...entries);
+        for (const leafEntry of entries) tileEntries.push(leafEntry);
+        checkTileEntryCount(tileEntries.length);
       }
       continue;
     }
     tileEntries.push(entry);
+    checkTileEntryCount(tileEntries.length);
   }
 
   const tileRanges: ParsedPmtiles['tileRanges'] = [];
   const tileDataEnd = checkedAdd(header.tileDataOffset, header.tileDataLength ?? 0, 'tile data end');
   for (const entry of tileEntries) {
     if (entry.runLength <= 0) throw new Error('invalid PMTiles tile run length');
+    if (!Number.isSafeInteger(entry.tileId)) throw new Error('PMTiles tile id is not a safe integer');
+    if (entry.length > 0xffffffff) throw new Error('PMTiles tile length exceeds 0xffffffff');
     const offset = checkedAdd(header.tileDataOffset, entry.offset, 'tile offset');
     const end = checkedAdd(offset, entry.length, 'tile end');
     if (end > tileDataEnd) throw new Error('PMTiles tile lies outside tile data');
@@ -400,7 +549,7 @@ export async function parsePmtiles(bytes: Uint8Array): Promise<ParsedPmtiles> {
   const uniqueTiles = uniqueRanges(tileRanges);
   const metadataEnd = checkedAdd(header.jsonMetadataOffset, header.jsonMetadataLength, 'metadata end');
   const metadata = new Uint8Array(await cache.decompress(bytes.slice(header.jsonMetadataOffset, metadataEnd).buffer, header.internalCompression));
-  const metadataValue: unknown = JSON.parse(new TextDecoder().decode(metadata));
+  const metadataValue = parseJson(new TextDecoder().decode(metadata));
   if (metadataValue === null || typeof metadataValue !== 'object' || Array.isArray(metadataValue)) {
     throw new Error('PMTiles metadata must be a JSON object');
   }
@@ -417,26 +566,23 @@ export async function parsePmtiles(bytes: Uint8Array): Promise<ParsedPmtiles> {
 /** Return absolute PMTiles profile cut points, including both 0 and EOF. */
 export async function derivePmtilesCutPoints(bytes: Uint8Array, opts: PmtilesOptions = {}): Promise<number[]> {
   const parsed = await parsePmtiles(bytes);
-  const tileGroupBytes = opts.tileGroupBytes ?? opts.tileGroup ?? DEFAULT_TILE_GROUP;
-  if (!Number.isSafeInteger(tileGroupBytes) || tileGroupBytes < 0) {
-    throw new Error(`bad tile grouping budget: ${tileGroupBytes}`);
-  }
-  return pmtilesCutPoints(bytes, parsed, groupedTileRanges(parsed.tileRanges, tileGroupBytes));
+  const groups = groupedTileRanges(parsed.tileRanges, tileGroupBudget(parsed, bytes.length, opts));
+  return pmtilesCutPoints(bytes.length, parsed, groups);
 }
 
 function pmtilesCutPoints(
-  bytes: Uint8Array,
+  fileLength: number,
   parsed: ParsedPmtiles,
   groups: { offset: number; length: number }[],
 ): number[] {
   const boundaries = new Set(parsed.sectionBoundaries);
-  if (bytes.length > PMTILES_PROBE) boundaries.add(PMTILES_PROBE);
+  if (fileLength > PMTILES_PROBE) boundaries.add(PMTILES_PROBE);
   for (const range of groups) {
     boundaries.add(range.offset);
     boundaries.add(range.offset + range.length);
   }
   boundaries.add(0);
-  boundaries.add(bytes.length);
+  boundaries.add(fileLength);
   return [...boundaries].sort((a, b) => a - b);
 }
 
@@ -470,18 +616,60 @@ function memorySource(bytes: Uint8Array): Source {
   };
 }
 
+// Node's own decoders, so their stream quirks (gzip padding, brotli trailing
+// bytes) define the format; library error texts are not part of it.
 async function decompressPmtiles(bytes: ArrayBuffer, compression: Compression): Promise<ArrayBuffer> {
   if (compression === Compression.None || compression === Compression.Unknown) return bytes;
-  const input = new Uint8Array(bytes);
-  const output = compression === Compression.Gzip
-    ? gunzipSync(input)
-    : compression === Compression.Brotli
-      ? brotliDecompressSync(input)
-      : compression === Compression.Zstd
-        ? (zlib as typeof zlib & { zstdDecompressSync?: (data: Uint8Array) => Uint8Array }).zstdDecompressSync?.(input)
-        : undefined;
-  if (output === undefined) throw new Error(`unsupported PMTiles compression ${compression}`);
-  return Uint8Array.from(output).buffer;
+  const decoders: Partial<Record<Compression, [string, (data: Uint8Array, opts: { maxOutputLength: number }) => Uint8Array]>> = {
+    [Compression.Gzip]: ['gzip', gunzipSync],
+    [Compression.Brotli]: ['brotli', brotliDecompressSync],
+    [Compression.Zstd]: ['zstd', decompressOneZstdFrame],
+  };
+  const decoder = decoders[compression];
+  if (decoder === undefined) throw new Error(`unsupported PMTiles compression ${compression}`);
+  const [name, decode] = decoder;
+  try {
+    return Uint8Array.from(decode(new Uint8Array(bytes), { maxOutputLength: PMTILES_BLOCK_CAP })).buffer;
+  } catch {
+    throw new Error(`PMTiles ${name} decompression failed`);
+  }
+}
+
+// Node 22 and 24 disagree on truncated zstd frames and on bytes after a
+// frame, so neither defines the format: a block is one complete frame.
+function decompressOneZstdFrame(bytes: Uint8Array, options: { maxOutputLength: number }): Uint8Array {
+  if (!isOneZstdFrame(bytes)) throw new Error('not one zstd frame');
+  return zstdDecompressSync(bytes, options);
+}
+
+// Whether `bytes` is one zstd frame (RFC 8878 §3.1.1) and nothing else: the
+// header, blocks up to the last one, the checksum when flagged. A skippable
+// frame is not one. Decoding checks the rest.
+function isOneZstdFrame(bytes: Uint8Array): boolean {
+  if (bytes.length < 5 || new DataView(bytes.buffer, bytes.byteOffset).getUint32(0, true) !== ZSTD_MAGIC) return false;
+  const descriptor = bytes[4]!;
+  const singleSegment = (descriptor >> 5) & 1;
+  let at = 5 + (1 - singleSegment) + [0, 1, 2, 4][descriptor & 3]! + [singleSegment, 2, 4, 8][descriptor >> 6]!;
+  for (;;) {
+    if (at + 3 > bytes.length) return false;
+    const header = bytes[at]! | (bytes[at + 1]! << 8) | (bytes[at + 2]! << 16);
+    const type = (header >> 1) & 3;
+    if (type === 3) return false;
+    at += 3 + (type === 1 ? 1 : header >> 3); // an RLE block is one byte, repeated
+    if (header & 1) return at + ((descriptor >> 2) & 1) * 4 === bytes.length;
+  }
+}
+
+function checkTileEntryCount(count: number): void {
+  if (count > PMTILES_MAX_TILE_ENTRIES) throw new Error('PMTiles has more than 2^30 tile entries');
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('PMTiles metadata is not valid JSON');
+  }
 }
 
 function addSection(boundaries: Set<number>, offset: number, length: number, fileLength: number, name: string): void {
@@ -554,17 +742,103 @@ function sha256Bytes(bytes: Uint8Array): Uint8Array {
 }
 
 // ---------------------------------------------------------------------------
+// Fragmented MP4 (the `mp4` profile): a walk over the top-level ISO BMFF boxes
+// ---------------------------------------------------------------------------
+
+// Boxes that open a media segment ahead of its `moof`; they travel with it.
+const MP4_SEGMENT_BOXES = new Set(['styp', 'emsg', 'prft']);
+
+interface Mp4Box {
+  offset: number;
+  size: number;
+  type: string;
+}
+
+/**
+ * Whether `--profile auto` packs these bytes as fragmented MP4: an `ftyp`
+ * box first, then a top-level `moof` before the walk ends. A malformed box
+ * before that only means "not fragmented MP4"; after it, packing fails.
+ */
+export function isFragmentedMp4(bytes: Uint8Array): boolean {
+  try {
+    for (const box of mp4Boxes(bytes)) {
+      if (box.offset === 0 && box.type !== 'ftyp') return false;
+      if (box.type === 'moof') return true;
+    }
+  } catch {
+    // A malformed box before the first `moof`: not fragmented MP4.
+  }
+  return false;
+}
+
+/**
+ * The `mp4` profile's leaf lengths: the init section (all before the first
+ * fragment), each fragment — its `moof` and `mdat`s, with any `styp`, `emsg`
+ * or `prft` boxes before the `moof` — and the boxes after the last `mdat`
+ * (an `mfra`). A player that reads a fragment at the range its `sidx` lists
+ * reads exactly one leaf.
+ */
+export function mp4Cuts(bytes: Uint8Array): number[] {
+  const points = [0];
+  let fragmented = false;
+  let segmentStart: number | undefined; // where the run of segment boxes before this box began
+  let previous = '';
+  for (const box of mp4Boxes(bytes)) {
+    if (!fragmented && box.type === 'moof') {
+      fragmented = true;
+      points.push(segmentStart ?? box.offset);
+    } else if (fragmented && previous === 'mdat' && box.type !== 'mdat') {
+      points.push(box.offset);
+    }
+    segmentStart = MP4_SEGMENT_BOXES.has(box.type) ? (segmentStart ?? box.offset) : undefined;
+    previous = box.type;
+  }
+  if (!fragmented) throw new Error('not a fragmented MP4: no moof box');
+  return cutLengths([...points, bytes.length]);
+}
+
+// Top-level boxes in file order; a malformed box throws.
+function* mp4Boxes(bytes: Uint8Array): Generator<Mp4Box> {
+  for (let offset = 0; offset < bytes.length;) {
+    const box = mp4Box(bytes, offset);
+    yield box;
+    offset += box.size;
+  }
+}
+
+// The box at `offset` (ISO/IEC 14496-12 §4.2): a 32-bit size; or 1 and a
+// 64-bit size after the type; or 0 for a box that runs to the end of the
+// file. Number() rounds only 64-bit sizes of 2^53 and up, which are past the
+// end of any file either way.
+function mp4Box(bytes: Uint8Array, offset: number): Mp4Box {
+  const remaining = bytes.length - offset;
+  const fail = (problem: string) => new Error(`MP4 box at ${offset} ${problem}`);
+  if (remaining < 8) throw fail('has a truncated header');
+  const view = new DataView(bytes.buffer, bytes.byteOffset + offset, remaining);
+  const size32 = view.getUint32(0);
+  const large = size32 === 1;
+  if (large && remaining < 16) throw fail('has a truncated header');
+  const size = large ? Number(view.getBigUint64(8)) : size32 === 0 ? remaining : size32;
+  if (size < (large ? 16 : 8)) throw fail('has an invalid size');
+  if (size > remaining) throw fail('extends past the end of the file');
+  return { offset, size, type: String.fromCharCode(...bytes.subarray(offset + 4, offset + 8)) };
+}
+
+// ---------------------------------------------------------------------------
 // Round-trip verification
 // ---------------------------------------------------------------------------
 
 // "1MiB" / "256KiB" / "262144" → bytes.
-export function parseChunk(text: string): number {
+export function parseChunk(text: string, flag = '--chunk'): number {
   const m = /^(\d+)(KiB|MiB|K|M)?$/.exec(text.trim());
-  if (!m) throw new Error(`bad --chunk value: ${text}`);
-  const n = Number(m[1]);
+  if (!m) throw new Error(`bad ${flag} value: ${text}`);
   const unit = m[2] === 'KiB' || m[2] === 'K' ? 1024 : m[2] === 'MiB' || m[2] === 'M' ? 1 << 20 : 1;
-  return n * unit;
+  const bytes = Number(m[1]) * unit;
+  if (!Number.isSafeInteger(bytes)) throw new Error(`bad ${flag} value: ${text}`);
+  return bytes;
 }
+
+export type ProofReader = (path: string) => Promise<Uint8Array | undefined>;
 
 // Open a real VerifiedFile over in-memory content + proofs and spot-read
 // random ranges — the publisher's (and any mirror's) round-trip check.
@@ -572,16 +846,17 @@ export function parseChunk(text: string): number {
 export async function verifyBytes(
   cid: string,
   content: Uint8Array,
-  proofs: Map<string, Uint8Array>,
+  proofs: Map<string, Uint8Array> | ProofReader,
   opts: { reads?: number; seed?: number } = {},
 ): Promise<number> {
   const reads = opts.reads ?? 32;
+  const readProof = proofs instanceof Map ? async (path: string) => proofs.get(path) : proofs;
   const proofBase = 'mem://file.proofs/';
   const fetchFn = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     const headers = (init as { headers?: Record<string, string> } | undefined)?.headers;
     if (url.startsWith(proofBase)) {
-      const body = proofs.get(url.slice(proofBase.length));
+      const body = await readProof(url.slice(proofBase.length));
       return body === undefined
         ? new Response('nf', { status: 404 })
         : new Response(new Uint8Array(body), { status: 200 });
@@ -599,6 +874,7 @@ export async function verifyBytes(
   const vf = new VerifiedFile({ cid, source: 'mem://file', fetchFn });
   await vf.ready();
   const size = vf.size ?? content.length;
+  if (size !== content.length) throw new Error(`file is ${content.length} bytes, descriptor says ${size}`);
   let x = (opts.seed ?? 1) >>> 0 || 1;
   const rand = () => {
     x ^= x << 13;
@@ -636,17 +912,22 @@ const INLINE_TOTAL_CAP = 256 * 1024;
 /** Build a MASL bundle CAR from a directory. Directories over INLINE_TOTAL_CAP emit a manifest-only proof; content stays URL-fetched. */
 export async function packAssets(directory: string, { types = new Map<string, string>() }: { types?: Map<string, string> } = {}): Promise<PackedAssets> {
   const files = new Map<string, Uint8Array>();
+  // Identical files share one CAR section: a bag with a repeated CID is
+  // rejected by the client (SPEC §3.3).
+  const blocks = new Map<string, { cid: CID; bytes: Uint8Array }>();
   const entries: [string, { src: CID; size: number; contentType?: string }][] = [];
   const walk = async (relative: string): Promise<void> => {
-    const items = await readdir(join(directory, relative), { withFileTypes: true });
+    const listing = await readdir(join(directory, relative), { withFileTypes: true, encoding: 'buffer' });
+    const items = listing.map((item) => ({ item, name: utf8Name(item.name, relative) }));
     items.sort((a, b) => (a.name < b.name ? -1 : 1));
-    for (const item of items) {
-      const path = relative === '' ? item.name : `${relative}/${item.name}`;
+    for (const { item, name } of items) {
+      const path = relative === '' ? name : `${relative}/${name}`;
       if (item.isDirectory()) { await walk(path); continue; }
       if (!item.isFile()) continue;
       const bytes = new Uint8Array(await readFile(join(directory, path)));
       const cid = CID.createV1(RAW_CODE, Digest.create(SHA2_256, sha256Bytes(bytes)));
-      const extension = path.includes('.') ? path.slice(path.lastIndexOf('.') + 1).toLowerCase() : '';
+      if (!blocks.has(cid.toString())) blocks.set(cid.toString(), { cid, bytes });
+      const extension = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : '';
       const contentType = types.get(extension) ?? DEFAULT_ASSET_TYPES.get(extension);
       files.set(path, bytes);
       entries.push([`/${path}`, { src: cid, size: bytes.length, ...(contentType === undefined ? {} : { contentType }) }]);
@@ -663,16 +944,24 @@ export async function packAssets(directory: string, { types = new Map<string, st
   const chunks: Uint8Array[] = [];
   const drain = (async () => { for await (const chunk of out) chunks.push(chunk); })();
   await writer.put({ cid: root, bytes: manifest });
-  const total = [...files.values()].reduce((n, bytes) => n + bytes.length, 0);
+  const total = [...blocks.values()].reduce((n, block) => n + block.bytes.length, 0);
   if (total <= INLINE_TOTAL_CAP) {
-    for (const bytes of files.values()) {
-      await writer.put({ cid: CID.createV1(RAW_CODE, Digest.create(SHA2_256, sha256Bytes(bytes))), bytes });
-    }
+    for (const block of blocks.values()) await writer.put(block);
   } else {
     process.stderr.write(`assets: ${total} B exceeds the ${INLINE_TOTAL_CAP} B inline budget; the CAR carries the manifest only and content is fetched from the content URL\n`);
   }
   await writer.close(); await drain;
   return { anchor: root.toString(), manifest, car: concatChunks(chunks), files };
+}
+
+// Manifest paths are text; a name that is not UTF-8 has no faithful path.
+function utf8Name(name: Uint8Array, relative: string): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(name);
+  } catch {
+    const lossy = new TextDecoder('utf-8', { ignoreBOM: true }).decode(name);
+    throw new Error(`asset name is not valid UTF-8: ${relative === '' ? lossy : `${relative}/${lossy}`}`);
+  }
 }
 
 const DEFAULT_ASSET_TYPES = new Map<string, string>([
@@ -691,78 +980,162 @@ function concatChunks(chunks: Uint8Array[]): Uint8Array {
 // CLI
 // ---------------------------------------------------------------------------
 
+const PACK_USAGE = 'usage: pack <input> [--profile auto|fixed|pmtiles|mp4] [--chunk N] [--tile-group N] [--unixfs] [--full-car pin.car] [--out dir]';
+const ASSETS_USAGE = 'usage: pack assets <dir> [--out bundle.car] [--type ext=mime]';
+const VERIFY_USAGE = 'usage: pack verify --cid <anchor> --file <path> --proofs <dir>';
+// Enough random reads to cross many shards; not a knob, since a full check
+// belongs to the Rust packer's verify.
+const VERIFY_READS = 64;
+
 async function main(argv: string[]): Promise<void> {
-  if (argv[0] === 'verify') {
-    const opts = flags(argv.slice(1));
-    const content = await readInput(opts.file!);
-    const proofs = await readProofDir(opts.proofs!);
-    const checked = await verifyBytes(opts.cid!, content, proofs, { reads: opts.reads ? Number(opts.reads) : undefined });
-    process.stdout.write(`verify OK: ${checked} reads matched the source\n`);
-    return;
+  if (argv[0] === 'verify') return verifyCommand(argv.slice(1));
+  if (argv[0] === 'assets') return assetsCommand(argv.slice(1));
+  return packCommand(argv);
+}
+
+async function verifyCommand(args: string[]): Promise<void> {
+  const { opts } = parseArgs(args, { values: ['cid', 'file', 'proofs'], positionals: 0 });
+  if (opts.cid === undefined || opts.file === undefined || opts.proofs === undefined) throw new Error(VERIFY_USAGE);
+  const content = await readInput(opts.file);
+  await verifyBytes(opts.cid, content, proofReader(opts.proofs), { reads: VERIFY_READS });
+  process.stdout.write('verify OK\n');
+}
+
+async function assetsCommand(args: string[]): Promise<void> {
+  const { positionals: [directory], opts } = parseArgs(args, { values: ['out', 'type'], positionals: 1 });
+  if (directory === undefined) throw new Error(ASSETS_USAGE);
+  const types = new Map<string, string>();
+  for (const value of opts.type?.split(',') ?? []) {
+    const equals = value.indexOf('=');
+    if (equals <= 0 || equals === value.length - 1) throw new Error(`bad --type ${value}`);
+    types.set(value.slice(0, equals).replace(/^\./, '').toLowerCase(), value.slice(equals + 1));
   }
-  if (argv[0] === 'assets') {
-    const directory = argv[1];
-    if (!directory) throw new Error('usage: pack assets <dir> [--out bundle.car] [--type ext=mime]');
-    const opts = flags(argv.slice(2));
-    const types = new Map<string, string>();
-    for (const value of opts.type?.split(',') ?? []) {
-      const equals = value.indexOf('=');
-      if (equals <= 0 || equals === value.length - 1) throw new Error(`bad --type ${value}`);
-      types.set(value.slice(0, equals).replace(/^\./, '').toLowerCase(), value.slice(equals + 1));
-    }
-    const packed = await packAssets(directory, { types });
-    await writeFile(opts.out ?? 'bundle.car', packed.car);
-    process.stdout.write(`${packed.anchor}\n`);
-    return;
+  const packed = await packAssets(directory, { types });
+  await writeFile(opts.out ?? 'bundle.car', packed.car);
+  process.stdout.write(`${packed.anchor}\n`);
+}
+
+async function packCommand(args: string[]): Promise<void> {
+  const { positionals: [input], opts } = parseArgs(args, {
+    values: ['profile', 'chunk', 'tile-group', 'out', 'full-car'],
+    booleans: ['unixfs'],
+    positionals: 1,
+  });
+  if (input === undefined) throw new Error(PACK_USAGE);
+  const fullCar = opts['full-car'];
+  if (fullCar !== undefined && opts.unixfs === undefined) throw new Error('--full-car requires --unixfs');
+  const chunkSize = opts.chunk === undefined ? undefined : parseChunk(opts.chunk);
+  const tileGroupBytes = opts['tile-group'] === undefined ? undefined : parseChunk(opts['tile-group'], '--tile-group');
+  const out = opts.out ?? `${input}.proofs`;
+  refuseInput(input, out, '--out');
+  if (resolve(input).startsWith(resolve(out) + sep)) throw new Error('--out contains the input file');
+  if (fullCar !== undefined) {
+    refuseInput(input, fullCar, '--full-car');
+    refuseInput(input, `${fullCar}.tmp`, '--full-car');
   }
-  const input = argv[0];
-  if (!input) throw new Error('usage: pack <input> [--profile auto|fixed|pmtiles] [--chunk N] [--tile-group N] [--unixfs] [--full-car pin.car] [--out dir]');
-  const opts = flags(argv.slice(1));
-  if (opts['full-car'] === 'true') throw new Error('--full-car requires an output path');
-  if (opts['full-car'] !== undefined && opts.unixfs !== 'true') throw new Error('--full-car requires --unixfs');
   const bytes = await readInput(input);
   const packed = await pack(bytes, {
     profile: opts.profile as PackProfile | undefined,
-    chunkSize: opts.chunk ? parseChunk(opts.chunk) : undefined,
-    tileGroupBytes: opts['tile-group'] ? parseChunk(opts['tile-group']) : undefined,
-    unixfs: opts.unixfs === 'true',
+    chunkSize,
+    tileGroupBytes,
+    unixfs: opts.unixfs !== undefined,
   });
-  const out = opts.out ?? `${input}.proofs`;
-  for (const [path, content] of packed.proofs) {
-    const file = `${out}/${path}`;
-    await mkdir(dirname(file), { recursive: true });
-    await writeFile(file, content);
-  }
-  if (opts['full-car']) await writeFile(opts['full-car'], packed.fullCar!);
+  await writeOutputs(input, out, packed, fullCar);
   process.stdout.write(`${packed.anchor}\n`);
+  const tileGroup = packed.tileGroupBytes === undefined ? '' : `tile group: ${packed.tileGroupBytes} bytes\n`;
   process.stderr.write(
-    `proofs: ${out}/ (${packed.leafCount} leaves, ${packed.proofs.size} files, descriptor ${packed.descriptor.length} bytes)\nmap: ${packed.mapCid}${packed.unixfsCid === undefined ? '' : `\nunixfs: ${packed.unixfsCid}`}\n`,
+    `proofs: ${out}/ (${packed.leafCount} leaves, ${packed.proofs.size} files, descriptor ${packed.descriptor.length} bytes)\n${tileGroup}map: ${packed.mapCid}${packed.unixfsCid === undefined ? '' : `\nunixfs: ${packed.unixfsCid}`}\n`,
   );
 }
 
-async function readProofDir(dir: string): Promise<Map<string, Uint8Array>> {
-  const { readdir } = await import('node:fs/promises');
-  const proofs = new Map<string, Uint8Array>();
-  const walk = async (sub: string): Promise<void> => {
-    for (const entry of await readdir(`${dir}/${sub}`, { withFileTypes: true })) {
-      const rel = sub === '' ? entry.name : `${sub}/${entry.name}`;
-      if (entry.isDirectory()) await walk(rel);
-      else proofs.set(rel, await readFile(`${dir}/${rel}`));
-    }
-  };
-  await walk('');
-  return proofs;
+// Directories first, then outputs that are the input file are refused, then
+// the CAR's `.tmp` is opened before any proof file is written (a failure is
+// reported after them), as the Rust packer does. Once the `.tmp` exists, any
+// failure removes it.
+async function writeOutputs(input: string, out: string, packed: Packed, fullCar: string | undefined): Promise<void> {
+  const dirs = new Set([...packed.proofs.keys()].map((path) => dirname(`${out}/${path}`)));
+  for (const dir of dirs) await mkdir(dir, { recursive: true });
+  await refuseInputAliases(input, out, packed, fullCar);
+  if (fullCar === undefined) return writeProofs(out, packed);
+  const tmp = `${fullCar}.tmp`;
+  const car = await open(tmp, 'w').catch((err: Error) => err);
+  if (car instanceof Error) {
+    await writeProofs(out, packed);
+    throw car;
+  }
+  try {
+    await writeProofs(out, packed);
+    await car.writeFile(packed.fullCar!);
+    await car.close();
+    // A crash mid-write must not leave a truncated CAR under the final name.
+    await rename(tmp, fullCar);
+  } catch (err) {
+    await car.close().catch(() => {});
+    await unlink(tmp).catch(() => {});
+    throw err;
+  }
 }
 
-function flags(args: string[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (let i = 0; i < args.length; i++) {
-    if (args[i]!.startsWith('--')) {
-      const key = args[i]!.slice(2);
-      out[key] = args[i + 1] && !args[i + 1]!.startsWith('--') ? args[++i]! : 'true';
-    }
+async function writeProofs(out: string, packed: Packed): Promise<void> {
+  for (const [path, content] of packed.proofs) await writeFile(`${out}/${path}`, content);
+}
+
+// Existing outputs that are the input file (a hardlink, or a path through a
+// symlink) are refused before any output is opened; the path checks in
+// packCommand miss these, and the Rust packer would fault on its input map.
+async function refuseInputAliases(input: string, out: string, packed: Packed, fullCar: string | undefined): Promise<void> {
+  const id = await fileId(input);
+  if (id === undefined) return;
+  for (const path of packed.proofs.keys()) {
+    if (await fileId(`${out}/${path}`) === id) throw new Error('--out contains the input file');
   }
-  return out;
+  if (fullCar !== undefined && await fileId(`${fullCar}.tmp`) === id) throw new Error('--full-car resolves to the input file');
+}
+
+// `dev:ino` of the file a path names (symlinks followed); undefined when it cannot be stat'd.
+async function fileId(path: string): Promise<string | undefined> {
+  const stats = await stat(path, { bigint: true }).catch(() => undefined);
+  return stats === undefined ? undefined : `${stats.dev}:${stats.ino}`;
+}
+
+function refuseInput(input: string, output: string, flag: string): void {
+  if (resolve(output) === resolve(input)) throw new Error(`${flag} resolves to the input file`);
+}
+
+// Reads a proof file only when the verifier asks for it; a missing one is a 404.
+function proofReader(dir: string): ProofReader {
+  return async (path) => {
+    try {
+      return new Uint8Array(await readFile(`${dir}/${path}`));
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+      throw err;
+    }
+  };
+}
+
+// Strict flags: anything the command does not use is an error, never ignored.
+function parseArgs(
+  args: string[],
+  spec: { values: string[]; booleans?: string[]; positionals: number },
+): { positionals: string[]; opts: Record<string, string> } {
+  const positionals: string[] = [];
+  const opts: Record<string, string> = {};
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    if (!arg.startsWith('--')) {
+      if (positionals.length === spec.positionals) throw new Error(`unexpected argument ${arg}`);
+      positionals.push(arg);
+      continue;
+    }
+    const name = arg.slice(2);
+    if (spec.booleans?.includes(name)) { opts[name] = 'true'; continue; }
+    if (!spec.values.includes(name)) throw new Error(`unknown flag ${arg}`);
+    const value = args[++i];
+    if (value === undefined || value === '' || value.startsWith('--')) throw new Error(`${arg} requires a value`);
+    opts[name] = value;
+  }
+  return { positionals, opts };
 }
 
 async function readInput(pathOrUrl: string): Promise<Uint8Array> {

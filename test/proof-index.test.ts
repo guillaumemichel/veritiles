@@ -8,6 +8,7 @@ import { RangeSource } from '../src/range-source.ts';
 import { toHex } from '../src/verify.ts';
 import { VerifiedStore } from '../src/verified-store.ts';
 import { deterministicBytes, flipByte, sha256Bytes } from './helpers/bytes.ts';
+import { gatedFetch } from './helpers/gated-fetch.ts';
 import { rangeFetch, type HostOptions } from './helpers/host.ts';
 import { buildProofPackage, type ProofPackage } from './helpers/package.ts';
 import { encodeMeta, encodeShard } from '../src/proof-format.ts';
@@ -74,6 +75,32 @@ test('a nested tree descends lazily: only covering shards are fetched', async ()
   proofRequests.length = 0;
   await index.leavesFor(0, 100);
   assert.ok(proofRequests.some((u) => u === headShard || u.endsWith(`/${headShard}`)));
+});
+
+test('leavesFor requests every covering shard before awaiting any, then signals', async () => {
+  // Ten 2-leaf shards, all in the top meta.
+  const fixture = await buildProofPackage({
+    mapBytes: deterministicBytes(2000, 43),
+    cuts: Array.from({ length: 20 }, () => 100),
+    shardCap: 72,
+  });
+  const gate = gatedFetch(rangeFetch(fixture.proofs));
+  const store = new VerifiedStore([new RangeSource('.', { fetchFn: gate.fetchFn })]);
+  const index = new ProofIndex(store, { topMeta: decodeDescriptor(fixture.descriptor).topMeta, fileSize: 2000 });
+  const lookup = index.leavesFor(250, 750, { onShardsRequested: () => gate.issued.push('signal') });
+  await gate.until(() => gate.issued.includes('signal'), 'the signal');
+  assert.deepEqual(gate.issued, ['./c8', './190', './258', 'signal'], 'shards 200, 400, 600 together, then the signal');
+  gate.hold(false);
+  assert.deepEqual(await lookup, asHex(fixture.leaves).slice(2, 8));
+});
+
+test('onShardsRequested fires even when every shard is cached', async () => {
+  const fixture = await buildProofPackage({ mapBytes, cuts });
+  const { index } = indexOver(fixture);
+  await index.leavesFor(0, 4000);
+  let signals = 0;
+  await index.leavesFor(0, 4000, { onShardsRequested: () => signals++ });
+  assert.equal(signals, 1);
 });
 
 test('a tampered shard is rejected', async () => {

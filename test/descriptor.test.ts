@@ -8,7 +8,8 @@ import { decodeDescriptor, encodeDescriptor } from '../src/descriptor.ts';
 import { encodeMeta, KIND_SHARD } from '../src/proof-format.ts';
 import { sha256Bytes } from './helpers/bytes.ts';
 
-const raw = CID.createV1(0x55, Digest.create(0x12, sha256Bytes(Uint8Array.of(1))));
+const raw = CID.createV1(0x55, Digest.create(0x1e, sha256Bytes(Uint8Array.of(1))));
+const rawSha256 = CID.createV1(0x55, Digest.create(0x12, sha256Bytes(Uint8Array.of(1))));
 const dagPb = CID.createV1(0x70, Digest.create(0x12, sha256Bytes(Uint8Array.of(2))));
 const dagCbor = CID.createV1(0x71, Digest.create(0x12, sha256Bytes(Uint8Array.of(3))));
 const meta = encodeMeta([{ kind: KIND_SHARD, length: 10, digest: sha256Bytes(Uint8Array.of(4)) }]);
@@ -28,6 +29,11 @@ test('rejects dag-pb maps and dag-cbor UnixFS bridges', () => {
   assert.throws(() => decodeDescriptor(badMap), /map CID codec must be raw/);
   const badUnixfs = encodeDescriptor({ mapCidBytes: raw.bytes, unixfsCidBytes: dagCbor.bytes, topMeta: meta, mapSize: 10 });
   assert.throws(() => decodeDescriptor(badUnixfs), /unixfs CID must be raw or dag-pb/);
+});
+
+test('rejects a sha2-256 map', () => {
+  const bytes = encodeDescriptor({ mapCidBytes: rawSha256.bytes, topMeta: meta, mapSize: 10 });
+  assert.throws(() => decodeDescriptor(bytes), /map CID must be blake3 with a 32-byte digest/);
 });
 
 test('rejects non-template keys and trailing bytes', () => {

@@ -2,8 +2,8 @@
 // leaves covering them. Warm path: the leaf lookup is answered synchronously
 // from cached nodes, cache hits are copied, and the rest is fetched in maximal
 // file-contiguous runs, one Range request each. Cold path: the exact requested
-// range is fetched SPECULATIVELY in parallel with the (async) leaf lookup —
-// leaf-aligned reads adopt the speculative body as-is once digests arrive,
+// range is fetched SPECULATIVELY in parallel with the lookup's shard requests
+// — leaf-aligned reads adopt the speculative body as-is once digests arrive,
 // collapsing a region's first read from two round trips to one. A misaligned
 // or tampered speculative body is discarded and the ordinary verified run
 // fetch takes over; integrity never depends on the speculation.
@@ -23,8 +23,14 @@ export interface Leaf {
 
 // The seam the read loop depends on: covering leaves for a byte range, async
 // (may fetch/verify proof structure) or synchronous (cached only, else null).
+// The async lookup calls `onShardsRequested` once the last proof request it
+// needs is out.
 export interface LeafIndex {
-  leavesFor(start: number, end: number, opts?: { signal?: AbortSignal }): Promise<Leaf[]>;
+  leavesFor(
+    start: number,
+    end: number,
+    opts?: { signal?: AbortSignal; onShardsRequested?: () => void },
+  ): Promise<Leaf[]>;
   cachedLeavesFor(start: number, end: number): Leaf[] | null;
 }
 
@@ -62,13 +68,18 @@ export class RangedReader {
     const out = new Uint8Array(end - offset);
 
     let leaves = this.#proofs.cachedLeavesFor(offset, end);
-    let spec: Speculation | null = null;
+    let spec = null as Speculation | null; // set in a callback: the cast stops TS narrowing it to null
     if (leaves === null) {
-      spec = this.#speculate(offset, end - offset, signal);
+      // Speculate only once the shard requests are out: a shard queued behind
+      // speculative content bytes delays every read it covers, and content
+      // cannot verify before its shard anyway, so waiting costs no latency.
+      const onShardsRequested = () => {
+        spec = this.#speculate(offset, end - offset, signal);
+      };
       try {
-        leaves = await this.#proofs.leavesFor(offset, end, { signal });
+        leaves = await this.#proofs.leavesFor(offset, end, { signal, onShardsRequested });
       } catch (err) {
-        spec.cancel();
+        spec?.cancel();
         throw err;
       }
     }

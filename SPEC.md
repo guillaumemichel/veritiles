@@ -17,6 +17,10 @@ All accepted CIDs are DASL CIDs: CIDv1, lowercase base32 text, sha2-256,
 32-byte digest, and codec `raw` (0x55) or `dag-cbor` (0x71). CIDv0,
 other multibases, other hashes, `dag-pb` anchors, and `car` anchors reject.
 
+The one exception is a descriptor's `map` (§2.1): a BDASL CID, codec `raw`,
+BLAKE3 (0x1e), 32-byte digest. It names a file and is never recomputed by a
+client, so every hash a client checks is sha2-256.
+
 | anchor codec | names                           | accepted by     |
 | ------------ | ------------------------------- | --------------- |
 | `dag-cbor`   | a ranges descriptor             | `VerifiedFile`  |
@@ -41,7 +45,7 @@ The descriptor accepts exactly one of these templates:
 ```
 {
   "v": 1,
-  "map": <tag-42 raw CID>,
+  "map": <tag-42 raw BLAKE3 CID>,
   "meta": <bytes>,
   "mapSize": <uint < 2^53>
 }
@@ -50,15 +54,18 @@ The descriptor accepts exactly one of these templates:
 ```
 {
   "v": 1,
-  "map": <tag-42 raw CID>,
+  "map": <tag-42 raw BLAKE3 CID>,
   "meta": <bytes>,
   "unixfs": <tag-42 raw-or-dag-pb CID>,
   "mapSize": <uint < 2^53>
 }
 ```
 
-`map` is sha2-256 of the complete file. `mapSize` must equal the coverage of
-the embedded top `meta`; a mismatch rejects the descriptor. Decoding is
+`map` is the BLAKE3 hash of the complete file: the file's name, the same for
+every packing of it. Clients never compute it; they use it to find content
+locations (§5). The anchor names one packing (it changes with the leaf
+layout or `unixfs`); `map` names the file. `mapSize` must equal the coverage
+of the embedded top `meta`; a mismatch rejects the descriptor. Decoding is
 strict: exactly these keys in this order, and trailing bytes reject.
 
 ### 2.2 Proof tree
@@ -81,7 +88,7 @@ shard := (u32le(relativeOffset) digest32)+
 meta  := (kind:u8 u64le(length >= 1) digest32)+
 ```
 
-A shard is at most 64 KiB (1,820 records). A meta is at most 256 KiB (6,397
+A shard is at most 64 KiB (1,820 records). A meta is at most 256 KiB (6,393
 records). `kind` 0 names a shard; `kind` 1 names a child directory. Meta child
 ranges are consecutive prefix sums. All proof files parse exactly to EOF.
 
@@ -94,7 +101,19 @@ adjacent uncached leaves where possible. Every slice is sha-256 checked before
 any slice from that response is cached. A client may speculatively fetch an
 exact requested range while it descends the proof tree, but may adopt it only
 once the descended leaf digests verify every slice — all before any is
-cached; a mismatch discards the whole speculative response.
+cached; a mismatch discards the whole speculative response. It should request
+a read's covering shards before its speculative range: a shard queued behind
+tile bytes delays every slice it covers.
+
+Before `root` verifies, a client may also request `{proof}/0` from its first
+proof location and, for each read waiting on the open, the exact requested
+range from its first configured content location (never a hinted one, §5).
+It may use such an early response only in place of the identical request it
+makes later to the same location — `0` once the descent derives it as a
+shard name, the range as that read's speculative fetch — and checks it
+exactly as a fresh response: a failed parent digest is a proof fault, and
+leaf digests gate adoption as above. A failed or unused early response is
+discarded.
 
 ## 3. Assets
 
@@ -184,14 +203,14 @@ the anchor chain exactly as a configured URL does; a hostile document can
 misdirect a request, never alter a result that verifies.
 
 **Format.** A UTF-8 JSON object (clients require no particular `Content-Type`),
-with a `hints` map from DASL CID text (§1) to an array of URL strings in
+with a `hints` map from CID text (§1) to an array of URL strings in
 preference order:
 
 ```json
 {
   "hints": {
     "bafyrei…desc": ["https://node.example/world.pmtiles.proofs"],
-    "bafkrei…file": [
+    "bafkr4i…map": [
       "https://cdn-a.example/world.pmtiles",
       "./mirror/world.pmtiles"
     ]
@@ -199,7 +218,7 @@ preference order:
 }
 ```
 
-Keys that are not DASL CIDs, and unknown keys at every level, are ignored;
+Keys that are not CIDs of §1, and unknown keys at every level, are ignored;
 duplicate JSON keys follow `JSON.parse` (the last wins). There is no version
 field — additive change rides on ignored unknown keys.
 
@@ -304,7 +323,8 @@ Because they are routinely fetched cross-origin, CORS must allow GET.
 
 The reference packer is a repository development tool; it is not part of the
 published client library package. Run it from a clone of this repository after
-`npm ci`.
+`npm ci`. A Rust port in `packer/` (`npm run pack:rs`) writes the same bytes
+for files too large for the TypeScript packer's in-memory read.
 
 ```
 npm run pack -- world.pmtiles
@@ -316,11 +336,33 @@ The default ranges pack writes `world.pmtiles.proofs/` and prints a dag-cbor
 descriptor anchor. `--unixfs` embeds a reproducible UnixFS root CID in the
 descriptor (§2.1) — the standard 256 KiB fixed-chunk `ipfs add --cid-version 1`
 layout — and `--full-car` also writes that DAG as a CAR for `ipfs dag import`.
+The CAR's blocks are in DAG post-order (children left to right, then their
+parent), each block once at its first occurrence, so the same file always
+yields the same CAR bytes.
+
+A PMTiles archive gets one leaf per tile group: contiguous tiles merged up to
+`--tile-group` bytes, cut at every section boundary and banded by zoom. By
+default the packer picks the smallest of 16, 32 and 64 KiB that lets the
+descriptor's top meta list every shard directly — a reader then reaches any
+shard without a directory round trip — else 64 KiB, and prints the budget it
+used. A band with more shards than the top meta has room for splits into
+subdirectories of at most 399 shards (child metas of at most 16 KiB), each
+listed in the top meta. The tree's shape is the packer's choice; readers
+follow whatever metas the descriptor names (§2.2).
+
+A fragmented MP4 (an `ftyp` box first, then a top-level `moof`) gets one
+leaf per fragment, in one band, from a walk over its top-level ISO BMFF
+boxes: everything before the first fragment (`ftyp`, `moov`, a global
+`sidx`) is one leaf; each fragment — its `moof` and `mdat` boxes, with any
+`styp`, `emsg` or `prft` boxes before the `moof` — is one leaf; boxes after
+the last `mdat` (an `mfra`) form a last leaf. A player that reads each
+fragment at the range its `sidx` lists fetches exactly one leaf.
 
 `pack assets <dir>` writes a MASL CAR and prints its dag-cbor manifest anchor.
-It bundles files no larger than 8 MiB as optional raw CAR sections; larger
-files stay out of the CAR and are fetched whole from the content base,
-verified against the manifest's raw `src` CID.
+When the directory's unique file contents total at most 256 KiB, every file
+travels in the CAR as a raw section, each distinct block once. Otherwise the
+CAR carries the manifest alone and files are fetched whole from the content
+base, verified against the manifest's raw `src` CID.
 
 ## 8. IPFS and DASL interoperability
 
@@ -346,12 +388,12 @@ gateway URLs:
 {
   "hints": {
     "bafyrei…desc": ["https://gw.example/ipfs/bafybei…proofs"],
-    "bafkrei…map": ["https://gw.example/ipfs/bafybei…unixfs"]
+    "bafkr4i…map": ["https://gw.example/ipfs/bafybei…unixfs"]
   }
 }
 ```
 
-Hints keys stay DASL CIDs (§5): the client looks up only CIDs it already
+Hints keys stay the CIDs of §1 (§5): the client looks up only CIDs it already
 holds or has verified, and the dag-pb CID rides inside the URL value, which
 is opaque to it. §6 host rules apply unchanged — the deserialized endpoint
 (never `?format=raw`), identity encoding, CORS, and `Range` + `206` on the

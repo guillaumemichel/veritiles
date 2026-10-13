@@ -1,17 +1,18 @@
 // Miniature verified packages: content bytes + meta/shard proof tree +
-// dag-cbor descriptor. The map CID is the raw whole-file content binding.
+// dag-cbor descriptor. The map CID is the raw whole-file BLAKE3 CID.
 // The proof-tree shape mirrors the reference publisher build (left-shallow
 // directories, ≤ cap shards).
 
 import { CID } from 'multiformats/cid';
 import * as Digest from 'multiformats/hashes/digest';
 
-import { encodeDescriptor } from '../../src/descriptor.ts';
+import { decodeDescriptor, encodeDescriptor } from '../../src/descriptor.ts';
 import { KIND_DIR, KIND_SHARD, SHARD_FILE_CAP, SHARD_RECORD_SIZE, shardName } from '../../src/proof-format.ts';
-import { sha256Bytes } from './bytes.ts';
+import { blake3Bytes, sha256Bytes } from './bytes.ts';
 import { encodeMeta, encodeShard } from '../../src/proof-format.ts';
 
 const SHA2_256 = 0x12;
+const BLAKE3 = 0x1e;
 const DAG_CBOR = 0x71;
 
 export interface RawLeaf {
@@ -28,7 +29,7 @@ export interface ProofFile {
 export interface ProofPackage {
   /** The VerifiedFile anchor: CIDv1(dag-cbor, sha2-256(descriptor)). */
   anchor: string;
-  /** The map's raw whole-file CID — the descriptor's content binding. */
+  /** The map's raw whole-file BLAKE3 CID — the descriptor's content name. */
   mapCid: string;
   descriptor: Uint8Array;
   /** Proof-base-relative files: 'root', '{hex}', '{hex}/meta', … */
@@ -53,7 +54,7 @@ export async function buildProofPackage({
 }: BuildOptions): Promise<ProofPackage> {
   const leaves = leavesFromCuts(mapBytes, cuts);
   const tree = buildProofTree(leaves, { shardCap, maxEntries: metaMaxEntries });
-  const mapCid = CID.createV1(0x55, Digest.create(SHA2_256, sha256Bytes(mapBytes)));
+  const mapCid = CID.createV1(0x55, Digest.create(BLAKE3, await blake3Bytes(mapBytes)));
   const mapCidBytes = mapCid.bytes;
   const descriptor = encodeDescriptor({ mapCidBytes, topMeta: tree.topMeta, mapSize: mapBytes.length });
   const anchor = CID.createV1(DAG_CBOR, Digest.create(SHA2_256, sha256Bytes(descriptor))).toString();
@@ -63,6 +64,22 @@ export async function buildProofPackage({
     if (file.path !== 'meta') proofs.set(file.path, file.content);
   }
   return { anchor, mapCid: mapCid.toString(), descriptor, proofs, mapBytes, leaves };
+}
+
+// The same file and leaves with the whole proof tree pushed under directory
+// `0`: the top meta's first (only) entry is a directory, so `{proof}/0` names
+// no shard — a shape the reference build never emits but the format allows.
+export function nestUnderDir(pkg: ProofPackage): ProofPackage {
+  const inner = decodeDescriptor(pkg.descriptor).topMeta;
+  const mapSize = pkg.mapBytes.length;
+  const topMeta = encodeMeta([{ kind: KIND_DIR, length: mapSize, digest: sha256Bytes(inner) }]);
+  const descriptor = encodeDescriptor({ mapCidBytes: CID.parse(pkg.mapCid).bytes, topMeta, mapSize });
+  const anchor = CID.createV1(DAG_CBOR, Digest.create(SHA2_256, sha256Bytes(descriptor))).toString();
+  const proofs = new Map([['root', descriptor], ['0/meta', inner]]);
+  for (const [path, content] of pkg.proofs) {
+    if (path !== 'root') proofs.set(`0/${path}`, content);
+  }
+  return { ...pkg, anchor, descriptor, proofs };
 }
 
 export function leavesFromCuts(mapBytes: Uint8Array, cuts: number[]): RawLeaf[] {

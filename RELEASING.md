@@ -29,7 +29,11 @@ From a clean tree on `main`:
 ```
 git status                 # only the intended release changes; nothing stray
 npm test && npm run typecheck && npm run build
+cargo build --release --manifest-path packer/Cargo.toml && npm run test:diff
 ```
+
+`npm run test:diff` checks the Rust packer against `tools/pack.ts` byte for
+byte; `npm test` does not run it.
 
 Do **not** stage the untracked working docs. `SPEC.md` is the only committed
 spec.
@@ -159,6 +163,7 @@ for that tag to then fail red on the duplicate.
 ## Checklist
 
 - [ ] Gate green (`npm test && npm run typecheck && npm run build`)
+- [ ] Packer diff green (`cargo build --release --manifest-path packer/Cargo.toml && npm run test:diff`)
 - [ ] `CHANGELOG.md` has the `[X.Y.Z]` entry
 - [ ] CDN pins are the current minor range (only changed on a minor bump)
 - [ ] `package.json` + `package-lock.json` at `X.Y.Z`

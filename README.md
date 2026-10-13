@@ -22,11 +22,13 @@ the sha2-256 chain rooted in the anchor (see [`SPEC.md`](./SPEC.md)).
   CAR handling. WebCrypto is the only cryptography.
 - **Zero per-tile overhead** — a warm tile read is one exact `Range`
   request, the same bytes an unverified client would fetch.
-- **One round trip for cold tiles** — tile data is fetched speculatively in
-  parallel with the proof descent and adopted after its hash checks out.
+- **One round trip for cold tiles** — tile data is fetched speculatively
+  right behind the proof piece covering it and adopted after its hash checks
+  out.
 - **Scales to planet** — proofs are offset-addressable: constant-size
   pieces, no upfront download, no index. First paint costs one descriptor
-  (a few KB) plus the covering pieces.
+  (tens of KB for a planet) plus the covering pieces; the descriptor, the
+  first piece and the first read share one round trip.
 - **Lazy verification** — opening a file hashes exactly one block (the
   descriptor, against the anchor); everything else verifies on first use.
 - **Works with every PMTiles renderer** — MapLibre GL, Leaflet (vector and
@@ -51,7 +53,7 @@ npm install veritiles
 or from a CDN as a script tag (exposes the `veritiles` global):
 
 ```html
-<script src="https://unpkg.com/veritiles@0.4/dist/veritiles.js"></script>
+<script src="https://unpkg.com/veritiles@0.5/dist/veritiles.js"></script>
 ```
 
 ## Usage
@@ -61,7 +63,7 @@ or from a CDN as a script tag (exposes the `veritiles` global):
 ```html
 <script src="https://unpkg.com/maplibre-gl@6.2.0/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/pmtiles@4.4.1/dist/pmtiles.js"></script>
-<script src="https://unpkg.com/veritiles@0.4/dist/veritiles.js"></script>
+<script src="https://unpkg.com/veritiles@0.5/dist/veritiles.js"></script>
 <script>
   const cid = "bafyrei…"; // the proof descriptor's CID — printed by `npm run pack`
   const source = new veritiles.VerifiedSource({
@@ -139,8 +141,9 @@ Both take:
 Construction is synchronous and validates the CID; the first read resolves
 locations (configured, then hinted) and fetches `{proof}/root`, hashing it
 against the anchor — after that, every proof file and content slice is verified
-against the digest its parent committed. A failed open is retried on the next
-read.
+against the digest its parent committed. With configured locations, the first
+proof piece and the first read's range are requested alongside `root` and used
+only once verified. A failed open is retried on the next read.
 
 ```js
 // Ship only the anchor; put world's location in a sibling hints.json.
@@ -153,13 +156,15 @@ with, beside the page, `hints.json`:
 {
   "hints": {
     "bafyrei…desc": ["https://node.example/world.pmtiles.proofs"],
-    "bafkrei…file": ["https://cdn-a.example/world.pmtiles", "https://cdn-b.example/world.pmtiles"]
+    "bafkr4i…map": ["https://cdn-a.example/world.pmtiles", "https://cdn-b.example/world.pmtiles"]
   }
 }
 ```
 
 Identity lives in the page (the `cid`), location lives in `hints.json` — each
-changes on its own cadence, and moving hosts is an edit to one JSON file.
+changes on its own cadence, and moving hosts is an edit to one JSON file. The
+file's key is the `map` CID the packer prints: its BLAKE3 hash, the same for
+every packing of that file.
 
 **Methods** (`VerifiedSource`, the pmtiles `Source` contract plus extras):
 
@@ -305,20 +310,44 @@ npm run pack -- assets ./public --out assets.car
 # → a directory totalling ≤ 256 KiB travels whole in the CAR (one fetch
 #   serves the bundle); anything larger emits the manifest alone — the
 #   proof — and clients fetch content from `{base}/{path}`
+
+# Check a package before uploading it:
+npm run pack -- verify --cid bafyrei… --file map.pmtiles --proofs map.pmtiles.proofs
+# → prints `verify OK`
 ```
 
 Upload `map.pmtiles` and `map.pmtiles.proofs/` to any static host and
 configure clients with the printed anchor. The packer cuts chunk
-boundaries at the ranges a pmtiles reader actually requests — one leaf per
-tile or tile group, zero over-fetch — and shapes the proof tree by zoom
-level, so low zooms stay shallow and the descriptor stays tiny at any
-scale. The generator profiles are documented in [`SPEC.md`](./SPEC.md) §7;
-`--profile fixed` packs non-PMTiles files. The reference application
+boundaries at the ranges a pmtiles reader actually requests — each leaf is
+one tile, or a run of small neighbouring tiles of at most 16, 32 or 64 KiB
+(`--tile-group`; by default the smallest that lets the descriptor list every
+proof shard, so a first view needs no extra round trip) — and shapes the
+proof tree by zoom level. A fragmented MP4 — video or audio, as Media Source
+Extensions players and DASH stream it — gets one leaf per fragment (`moof`
+plus `mdat`) after one for the init section, so a player that reads each
+fragment at the range its `sidx` lists downloads exactly that fragment.
+Other files pack with fixed-size leaves (`--chunk`, default 1 MiB). The reference application
 (PMTiles archive → verified map) lives in the
 [ipfs-pmtiles-demo](https://github.com/guillaumemichel/ipfs-pmtiles-demo)
 repository, alongside a
 [live demo](https://guillaumemichel.github.io/ipfs-pmtiles-demo/) of this
 verification client (try `?tamper=1`).
+
+The TS packer reads its whole input into memory, which caps it near 2 GiB.
+For larger files — a planet-scale PMTiles — use the Rust packer in
+[`packer/`](./packer/README.md). It takes the same arguments and writes the
+same bytes, but reads local files only (download with `curl -o` first) and
+needs Rust and a C compiler:
+
+```sh
+npm run pack:rs -- planet.pmtiles
+npm run pack:rs -- planet.pmtiles --unixfs --full-car planet.car
+npm run pack:rs -- assets ./public --out assets.car
+npm run pack:rs -- verify --cid bafyrei… --file planet.pmtiles --proofs planet.pmtiles.proofs
+```
+
+Its `verify` hashes every byte; the TS `verify` spot-reads 64 random ranges
+through a real client.
 
 ## Development
 

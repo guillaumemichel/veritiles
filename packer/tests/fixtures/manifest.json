@@ -1,0 +1,211 @@
+{
+ "description": "encodeManifest(withType); entry i: src = raw CID of [i % 256, i >> 8], size = opts.size ?? i*1000, contentType on even i only; `paths` omitted when long (then `count` and many(count) \"/f<i>\")",
+ "cases": [
+  {
+   "name": "one",
+   "paths": [
+    "/a"
+   ],
+   "count": 1,
+   "manifest": "a26524747970656d696e672e6461736c2e6d61736c697265736f7572636573a1622f61a263737263d82a5825000155122096a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc76473697a6500",
+   "manifestSha256": "d43b3a80ef7c9b5425fcc084b3bec2cd4e46b351a1ab306d622da677bc6c1199"
+  },
+  {
+   "name": "order by encoded length then bytes",
+   "paths": [
+    "/b",
+    "/a",
+    "/aa",
+    "/A",
+    "/😀",
+    "/",
+    "/a.txt",
+    "/a/b",
+    "/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+   ],
+   "count": 10,
+   "manifest": "a26524747970656d696e672e6461736c2e6d61736c697265736f7572636573aa622f41a263737263d82a582500015512209b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f96473697a65190bb8622f61a263737263d82a5825000155122047dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f2546473697a651903e8622f62a263737263d82a5825000155122096a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc76473697a6500632f6161a263737263d82a5825000155122099be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e86473697a651907d0642f612f62a263737263d82a582500015512200a6361b3a802f55cd5ae06101c88a1e216320fe11cc0cfe1d791eed08a1200fd6473697a65191b58642fee8080a263737263d82a582500015512202921a11f25dadaa24aa79a548e4e81508c2e5e56af2d833d65e2bcce448ce2f56473697a65191388652ff09f9880a263737263d82a58250001551220c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae76473697a65190fa0662f612e747874a263737263d82a58250001551220ceb827ad3d3884fd4d50ae6099d6d50c09a21e72ebd309708e8b69d93df19e556473697a65191770781f2f787878787878787878787878787878787878787878787878787878787878a263737263d82a58250001551220e545d395bb3fd971f91bf9a2b6722831df704efae6c1aa9da0989ed0970b77bb6473697a65191f4079012e2f79797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979792f7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7aa263737263d82a58250001551220a2c4aed1cf757cd9a509734a267ffc7b1166b55f4c8f9c3e3550c56e743328fc6473697a65192328",
+   "manifestSha256": "d672d1daaf1278c69dd83b0a810ba74c5921e112c64ab2a80220a0f9e2a3e69e"
+  },
+  {
+   "name": "content types",
+   "paths": [
+    "/a.png",
+    "/b",
+    "/c"
+   ],
+   "count": 3,
+   "contentType": "image/png",
+   "manifest": "a26524747970656d696e672e6461736c2e6d61736c697265736f7572636573a3622f62a263737263d82a5825000155122047dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f2546473697a651903e8622f63a363737263d82a5825000155122099be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e86473697a651907d06c636f6e74656e742d7479706569696d6167652f706e67662f612e706e67a363737263d82a5825000155122096a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc76473697a65006c636f6e74656e742d7479706569696d6167652f706e67",
+   "manifestSha256": "d7c2c136e7fc77d9ca6aa97fbdc930df4adf9d1182a68f01bde1dfb8189a81e6"
+  },
+  {
+   "name": "size over 2^32",
+   "paths": [
+    "/big"
+   ],
+   "count": 1,
+   "size": 1099511627776,
+   "manifest": "a26524747970656d696e672e6461736c2e6d61736c697265736f7572636573a1642f626967a263737263d82a5825000155122096a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc76473697a651b0000010000000000",
+   "manifestSha256": "0527700043e85664b4cba8e14f23617345e4ba0951385562cdf8dc09ad0ed60b"
+  },
+  {
+   "name": "root path",
+   "paths": [
+    "/"
+   ],
+   "count": 1,
+   "manifest": "a26524747970656d696e672e6461736c2e6d61736c697265736f7572636573a1612fa263737263d82a5825000155122096a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc76473697a6500",
+   "manifestSha256": "78df59ae69ce4db951d1e5ce275344503041a19c10b323bb607071952da1915a"
+  },
+  {
+   "name": "empty (error)",
+   "paths": [],
+   "count": 0,
+   "error": "manifest must contain at least one resource"
+  },
+  {
+   "name": "no leading slash (error)",
+   "paths": [
+    "a"
+   ],
+   "count": 1,
+   "error": "manifest: invalid resource path"
+  },
+  {
+   "name": "empty segment (error)",
+   "paths": [
+    "/a//b"
+   ],
+   "count": 1,
+   "error": "path: empty segment"
+  },
+  {
+   "name": "dot segment (error)",
+   "paths": [
+    "/a/./b"
+   ],
+   "count": 1,
+   "error": "path: '.' segment"
+  },
+  {
+   "name": "dotdot segment (error)",
+   "paths": [
+    "/.."
+   ],
+   "count": 1,
+   "error": "path: '..' segment"
+  },
+  {
+   "name": "NUL segment (error)",
+   "paths": [
+    "/a\u0000b"
+   ],
+   "count": 1,
+   "error": "path: NUL segment"
+  },
+  {
+   "name": "32 segments",
+   "paths": [
+    "/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d"
+   ],
+   "count": 1,
+   "manifest": "a26524747970656d696e672e6461736c2e6d61736c697265736f7572636573a178402f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f642f64a263737263d82a5825000155122096a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc76473697a6500",
+   "manifestSha256": "765beffdfd60f0f176e5fe0b46278a3236158eff53ddfa02cedede1c33c5d149"
+  },
+  {
+   "name": "33 segments (error)",
+   "paths": [
+    "/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d"
+   ],
+   "count": 1,
+   "error": "path: too many segments"
+  },
+  {
+   "name": "segment of 255 bytes",
+   "paths": [
+    "/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"
+   ],
+   "count": 1,
+   "manifest": "a26524747970656d696e672e6461736c2e6d61736c697265736f7572636573a17901002f737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373737373a263737263d82a5825000155122096a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc76473697a6500",
+   "manifestSha256": "c8a8d29c4c04eed487dec7853cd8aeb6df358fb2cb489a8e7fb39872d3e97991"
+  },
+  {
+   "name": "segment of 256 bytes (error)",
+   "paths": [
+    "/ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"
+   ],
+   "count": 1,
+   "error": "path: segment over 255 bytes"
+  },
+  {
+   "name": "path of 4096 bytes",
+   "paths": [
+    "/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"
+   ],
+   "count": 1,
+   "manifestSha256": "51054c45d3591ab71dc1b320f8edb983121bc0411718d4948fb05139fef7a657"
+  },
+  {
+   "name": "path of 4097 bytes (error)",
+   "paths": [
+    "/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss/sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssx"
+   ],
+   "count": 1,
+   "error": "manifest: invalid resource path"
+  },
+  {
+   "name": "first error in sorted order wins (error)",
+   "paths": [
+    "/ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss",
+    "/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d"
+   ],
+   "count": 2,
+   "error": "path: too many segments"
+  },
+  {
+   "name": "duplicate (error)",
+   "paths": [
+    "/a",
+    "/a"
+   ],
+   "count": 2,
+   "error": "duplicate manifest path /a"
+  },
+  {
+   "name": "content-type 255 bytes",
+   "paths": [
+    "/a"
+   ],
+   "count": 1,
+   "contentType": "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+   "manifest": "a26524747970656d696e672e6461736c2e6d61736c697265736f7572636573a1622f61a363737263d82a5825000155122096a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc76473697a65006c636f6e74656e742d7479706578ff747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474747474",
+   "manifestSha256": "c712a377106c83ec90b76e2b5ad98b9aa83e9652dbd50dbac458c8158579ef1d"
+  },
+  {
+   "name": "content-type 256 bytes (error)",
+   "paths": [
+    "/a"
+   ],
+   "count": 1,
+   "contentType": "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+   "error": "manifest content-type must be 1..255 bytes"
+  },
+  {
+   "name": "4000 entries",
+   "count": 4000,
+   "manifestSha256": "c2b4b64d3b3ae8d7bfdbe73182167e29e9c5fc3357d9348b5fd76182405ef8a5"
+  },
+  {
+   "name": "over the cap (error)",
+   "count": 5000,
+   "error": "manifest body over cap"
+  },
+  {
+   "name": "65536 entries (error)",
+   "count": 65536,
+   "error": "bad CBOR length 65536"
+  }
+ ]
+}

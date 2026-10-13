@@ -74,7 +74,8 @@ test('F-02/F-03: proof default derivation + ready sets size', async () => {
   assert.equal(vf.cid, pkg.anchor);
   await vf.ready();
   assert.equal(vf.size, pkg.mapBytes.length);
-  assert.deepEqual(proofGets(requests), [`${FILE}.proofs/root`]);
+  // The open sends the first shard alongside the descriptor (first paint).
+  assert.deepEqual(proofGets(requests), [`${FILE}.proofs/root`, `${FILE}.proofs/0`]);
 });
 
 // F-04 — read clamps at EOF, empties out-of-range, returns fresh copies.

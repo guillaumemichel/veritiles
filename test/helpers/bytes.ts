@@ -2,6 +2,8 @@
 
 import { createHash } from 'node:crypto';
 
+import { createBLAKE3 } from 'hash-wasm';
+
 // xorshift32-based deterministic bytes so fixtures never depend on RNG state.
 export function deterministicBytes(length: number, seed = 42): Uint8Array {
   const out = new Uint8Array(length);
@@ -38,4 +40,8 @@ export function rng(seed: number): () => number {
     x ^= x << 5;
     return (x >>> 0) / 0x100000000;
   };
+}
+
+export async function blake3Bytes(bytes: Uint8Array): Promise<Uint8Array> {
+  return (await createBLAKE3()).update(bytes).digest('binary');
 }
