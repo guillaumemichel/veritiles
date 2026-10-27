@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { NotFoundError, VerifiedAsset } from '../src/asset.ts';
 import { assetProtocol } from '../src/asset-protocol.ts';
 import { VerificationError } from '../src/verify.ts';
-import { serveArtifact } from './helpers/artifact.ts';
+import { buildArtifact, serveArtifact } from './helpers/artifact.ts';
 import { buildRaw, buildTree, TREE_ENTRIES } from './helpers/fixtures.ts';
 
 const STYLE_BASE = 'https://h/style';
@@ -91,4 +91,29 @@ test('M-10 a URL with no path resolves bytes("")', async () => {
   const { raw, style, protocol } = await setup();
   const res = await protocol({ url: `verified://${style.cid}` });
   assert.deepEqual(new Uint8Array(res.data), raw.files.get(''));
+});
+
+// MapLibre uses what a handler answers as it is: it asks for a sprite index
+// or a style as `json`, and parses nothing itself.
+test('M-11 a json request resolves the parsed value, a string request the text', async () => {
+  const body = JSON.stringify({ shop: { x: 0, y: 0, width: 16, height: 16, pixelRatio: 1 } });
+  const artifact = await buildArtifact(new TextEncoder().encode(body));
+  const server = serveArtifact([{ base: STYLE_BASE, fixture: artifact }]);
+  const protocol = assetProtocol([new VerifiedAsset({ cid: artifact.anchor, source: STYLE_BASE, fetchFn: server.fetch })]);
+  const url = `verified://${artifact.anchor}`;
+  assert.deepEqual((await protocol({ url, type: 'json' })).data, JSON.parse(body));
+  assert.equal((await protocol({ url, type: 'string' })).data, body);
+});
+
+test('M-12 an arrayBuffer or image request resolves the bytes', async () => {
+  const { raw, style, protocol } = await setup();
+  for (const type of ['arrayBuffer', 'image'] as const) {
+    const res = await protocol({ url: `verified://${style.cid}`, type });
+    assert.deepEqual(new Uint8Array(res.data), raw.files.get(''), type);
+  }
+});
+
+test('M-13 a json request for bytes that are not JSON rejects', async () => {
+  const { style, protocol } = await setup();
+  await assert.rejects(protocol({ url: `verified://${style.cid}`, type: 'json' }), SyntaxError);
 });
