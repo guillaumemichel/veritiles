@@ -4,9 +4,8 @@
     <meta charset="utf-8">
     <title>veritiles + verified assets (style + glyphs)</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
-    <script src="https://unpkg.com/maplibre-gl@6.2.0/dist/maplibre-gl.js"></script>
-    <link href="https://unpkg.com/maplibre-gl@6.2.0/dist/maplibre-gl.css" rel="stylesheet">
-    <script src="https://unpkg.com/pmtiles@4.4.1/dist/pmtiles.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@6.16.0/dist/maplibre-gl.css" rel="stylesheet">
+    <script src="https://unpkg.com/pmtiles@4.5.0/dist/pmtiles.js"></script>
     <script src="https://unpkg.com/veritiles@0.6/dist/veritiles.js"></script>
     <style>
         body { margin: 0; }
@@ -39,6 +38,9 @@
          anchors below drift. Only glyph ranges 0-511 ship with the example;
          a range it lacks is an authenticated absence and renders empty. -->
     <script type="module">
+        // MapLibre GL 6 ships ES modules only; pmtiles and veritiles load as globals above.
+        import * as maplibregl from 'https://unpkg.com/maplibre-gl@6.16.0/dist/maplibre-gl.mjs';
+
         // NOTE: MAP_ANCHOR predates veritiles 0.3.0's proof format — the
         // hosted demo map is the retired layout. Republish the map with
         // `npm run pack -- map.pmtiles` and paste the anchor + URL here.

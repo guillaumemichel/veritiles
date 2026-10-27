@@ -61,10 +61,12 @@ or from a CDN as a script tag (exposes the `veritiles` global):
 ### MapLibre GL
 
 ```html
-<script src="https://unpkg.com/maplibre-gl@6.2.0/dist/maplibre-gl.js"></script>
-<script src="https://unpkg.com/pmtiles@4.4.1/dist/pmtiles.js"></script>
+<script src="https://unpkg.com/pmtiles@4.5.0/dist/pmtiles.js"></script>
 <script src="https://unpkg.com/veritiles@0.6/dist/veritiles.js"></script>
-<script>
+<script type="module">
+  // MapLibre GL 6 ships ES modules only.
+  import * as maplibregl from "https://unpkg.com/maplibre-gl@6.16.0/dist/maplibre-gl.mjs";
+
   const cid = "bafyrei…"; // the proof descriptor's CID — printed by `npm run pack`
   const source = new veritiles.VerifiedSource({
     cid,

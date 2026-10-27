@@ -4,9 +4,8 @@
     <meta charset="utf-8">
     <title>veritiles + MapLibre GL</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
-    <script src="https://unpkg.com/maplibre-gl@6.2.0/dist/maplibre-gl.js"></script>
-    <link href="https://unpkg.com/maplibre-gl@6.2.0/dist/maplibre-gl.css" rel="stylesheet">
-    <script src="https://unpkg.com/pmtiles@4.4.1/dist/pmtiles.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@6.16.0/dist/maplibre-gl.css" rel="stylesheet">
+    <script src="https://unpkg.com/pmtiles@4.5.0/dist/pmtiles.js"></script>
     <script src="https://unpkg.com/veritiles@0.6/dist/veritiles.js"></script>
     <style>
         body { margin: 0; }
@@ -22,7 +21,10 @@
 <body>
     <div id="map"></div>
     <div id="badge">loading…</div>
-    <script>
+    <script type="module">
+        // MapLibre GL 6 ships ES modules only; pmtiles and veritiles load as globals above.
+        import * as maplibregl from 'https://unpkg.com/maplibre-gl@6.16.0/dist/maplibre-gl.mjs';
+
         // The anchor CID is the only trust input; the source URL is
         // untrusted and could be any mirror serving the same bytes.
         // NOTE: the hosted demo package predates veritiles 0.3.0's proof

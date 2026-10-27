@@ -4,6 +4,18 @@ All notable changes to this project are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (pre-1.0: minor = feature, patch =
 fix).
 
+## [Unreleased]
+
+### Fixed
+
+- The MapLibre examples (`examples/maplibre.html`, `hints.html`,
+  `assets.html`) and the README's MapLibre snippet import MapLibre GL's ES
+  module. MapLibre 6 ships no `maplibre-gl.js`, so they stopped at a 404
+  before drawing a tile. They now pin MapLibre GL 6.16.0 and PMTiles 4.5.0.
+- The OpenLayers example pins OpenLayers 9.2.4: ol-pmtiles 2.0.2's browser
+  bundle throws on the first tile with OpenLayers 10, so the example drew
+  nothing.
+
 ## [0.6.1] — Verified sprites
 
 ### Fixed
