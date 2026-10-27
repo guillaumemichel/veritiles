@@ -4,7 +4,7 @@ All notable changes to this project are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (pre-1.0: minor = feature, patch =
 fix).
 
-## [Unreleased]
+## [0.6.0] — Routers
 
 ### Added
 
@@ -377,6 +377,7 @@ anchor.
   with failover across mirrors, tamper bans, and verified-byte caching.
   Examples for MapLibre GL, Leaflet, and OpenLayers.
 
+[0.6.0]: https://github.com/guillaumemichel/veritiles/releases/tag/v0.6.0
 [0.5.0]: https://github.com/guillaumemichel/veritiles/releases/tag/v0.5.0
 [0.4.0]: https://github.com/guillaumemichel/veritiles/releases/tag/v0.4.0
 [0.3.1]: https://github.com/guillaumemichel/veritiles/releases/tag/v0.3.1

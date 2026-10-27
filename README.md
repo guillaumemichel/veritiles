@@ -53,7 +53,7 @@ npm install veritiles
 or from a CDN as a script tag (exposes the `veritiles` global):
 
 ```html
-<script src="https://unpkg.com/veritiles@0.5/dist/veritiles.js"></script>
+<script src="https://unpkg.com/veritiles@0.6/dist/veritiles.js"></script>
 ```
 
 ## Usage
@@ -63,7 +63,7 @@ or from a CDN as a script tag (exposes the `veritiles` global):
 ```html
 <script src="https://unpkg.com/maplibre-gl@6.2.0/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/pmtiles@4.4.1/dist/pmtiles.js"></script>
-<script src="https://unpkg.com/veritiles@0.5/dist/veritiles.js"></script>
+<script src="https://unpkg.com/veritiles@0.6/dist/veritiles.js"></script>
 <script>
   const cid = "bafyrei…"; // the proof descriptor's CID — printed by `npm run pack`
   const source = new veritiles.VerifiedSource({
