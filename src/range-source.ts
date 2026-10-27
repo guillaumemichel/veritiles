@@ -3,9 +3,13 @@
 // cannot tell the difference. Two request shapes only: a plain GET for
 // whole small files (assets and proofs — CORS simple requests in every
 // browser) and a single-`Range` GET for map byte runs. Returns UNVERIFIED
-// bytes; the VerifiedStore above is the one verification choke point.
+// bytes; the VerifiedStore above is the one verification choke point. A
+// request a router carries goes through its fetch (SPEC §6), and a request
+// that fails reports its own verdict.
 
 import { readBody } from './read-body.ts';
+import { type Route, send } from './router.ts';
+import { type Body, verdictOf } from './verdict.ts';
 
 export type FetchFn = typeof fetch;
 
@@ -26,17 +30,18 @@ export class RangeBlockedError extends Error {
 export class RangeSource {
   #base: string;
   #fetchFn: FetchFn;
+  #route: Route | undefined;
   #plainGetOk = false;
 
-  constructor(base: string, { fetchFn }: { fetchFn?: FetchFn } = {}) {
+  constructor(base: string, { fetchFn, route }: { fetchFn?: FetchFn; route?: Route } = {}) {
     this.#base = base.replace(/\/+$/, '');
     this.#fetchFn = fetchFn ?? ((...args: Parameters<FetchFn>) => fetch(...args));
+    this.#route = route;
   }
 
   // Whole file by a validated bundle path; body read with a hard cap.
-  async fetchWhole(path: string, cap: number, { signal }: { signal?: AbortSignal } = {}): Promise<Uint8Array> {
-    const res = await this.#request(this.#url(path), { signal }, true);
-    const body = await readBody(res, cap);
+  async fetchWhole(path: string, cap: number, { signal }: { signal?: AbortSignal } = {}): Promise<Body> {
+    const body = await this.#fetch(this.#url(path), { signal }, cap, true);
     this.#plainGetOk = true;
     return body;
   }
@@ -48,10 +53,9 @@ export class RangeSource {
     start: number,
     length: number,
     { signal }: { signal?: AbortSignal } = {},
-  ): Promise<Uint8Array> {
+  ): Promise<Body> {
     const init = { signal, headers: { Range: `bytes=${start}-${start + length - 1}` } };
-    const res = await this.#request(this.#url(path), init, false);
-    return readBody(res, length);
+    return this.#fetch(this.#url(path), init, length, false);
   }
 
   // A file artifact's bytes live at `{base}` itself (SPEC §3); a member lives at
@@ -61,10 +65,24 @@ export class RangeSource {
     return path === '' ? this.#base : `${this.#base}/${encodePath(path)}`;
   }
 
-  async #request(url: string, init: RequestInit, plainGet: boolean): Promise<Response> {
+  // One request and its body, which is the caller's to judge. A failure is
+  // judged here: unused if the caller aborted, rejected if the body broke its
+  // cap or never came, else failed.
+  async #fetch(url: string, init: RequestInit, cap: number, plainGet: boolean): Promise<Body> {
+    const { response, settle } = send(this.#route, this.#fetchFn, url, init);
+    try {
+      const res = await this.#answer(url, response, plainGet);
+      return { bytes: await readBody(res, cap), settle };
+    } catch (err) {
+      settle(verdictOf(err, init.signal ?? undefined));
+      throw err;
+    }
+  }
+
+  async #answer(url: string, response: Promise<Response>, plainGet: boolean): Promise<Response> {
     let res: Response;
     try {
-      res = await this.#fetchFn(url, init);
+      res = await response;
     } catch (err) {
       if (!plainGet && this.#plainGetOk && err instanceof TypeError) {
         throw new RangeBlockedError(

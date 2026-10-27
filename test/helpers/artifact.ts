@@ -6,7 +6,7 @@ import { encodeManifest } from '../../src/manifest.ts';
 import type { FetchFn } from '../../src/range-source.ts';
 
 export interface TreeEntry { path: string; bytes: Uint8Array; contentType?: string; }
-export interface Artifact { anchor: string; rootCid: string; files: Map<string, Uint8Array>; proof?: Uint8Array; srcCids?: Map<string, string>; }
+export interface Artifact { anchor: string; rootCid: string; files: Map<string, Uint8Array>; proof?: Uint8Array; manifest?: Uint8Array; srcCids?: Map<string, string>; }
 export interface BuildOptions { inlineRaw?: boolean }
 
 export async function buildArtifact(input: Uint8Array | TreeEntry[], { inlineRaw = true }: BuildOptions = {}): Promise<Artifact> {
@@ -34,7 +34,7 @@ export async function buildArtifact(input: Uint8Array | TreeEntry[], { inlineRaw
     if (file.bytes.length <= 2 ** 23 && !seen.has(cid.toString())) { seen.add(cid.toString()); await writer.put({ cid, bytes: file.bytes }); }
   }
   await writer.close(); await drain;
-  return { anchor: root.toString(), rootCid: root.toString(), files, proof: concat(chunks), srcCids };
+  return { anchor: root.toString(), rootCid: root.toString(), files, proof: concat(chunks), manifest, srcCids };
 }
 
 export interface ServeHooks { tamper?: (url: string, bytes: Uint8Array) => Uint8Array | undefined; status?: (url: string) => number | undefined; dropProof?: boolean; }
@@ -49,6 +49,7 @@ export function serveArtifact(entries: ServeEntry[]): Server {
     for (const route of routes) {
       let kind: 'proof' | 'content' | undefined; let bytes: Uint8Array | undefined;
       if (url === `${route.base}.car`) { kind = 'proof'; bytes = route.fixture.proof; }
+      else if (url === `${route.base}.masl`) { kind = 'proof'; bytes = route.fixture.manifest; }
       else if (url === route.base) { kind = 'content'; bytes = route.fixture.files.get(''); }
       else if (url.startsWith(`${route.base}/`)) { kind = 'content'; bytes = route.fixture.files.get(url.slice(route.base.length + 1).split('/').map(decodeURIComponent).join('/')); }
       if (kind === undefined) continue;

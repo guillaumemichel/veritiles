@@ -90,6 +90,9 @@ export function assetsCorpus(): PackCase[] {
     assetsCase('manifest over its cap (error)', Object.fromEntries(Array.from({ length: 5000 }, (_, i) => [`d/${i}`, text(`${i}`)]))),
     assetsCase('--out into a missing directory (error)', { 'd/a': text('a') }, ['--out', 'missing/b.car']),
     assetsCase('--out elsewhere', { 'd/a': text('a') }, ['--out', 'out/b.car'], empty('out')),
+    assetsCase('--out without .car: the block appends .masl', { 'd/a': text('a') }, ['--out', 'out/b'], empty('out')),
+    assetsCase('--out ending in .CAR keeps it', { 'd/a': text('a') }, ['--out', 'B.CAR']),
+    assetsCase('the block path is a directory (error)', { 'd/a': text('a') }, ['--out', 'b.car'], empty('b.masl')),
     { name: 'assets examples/assets/fonts → fonts.car', inputs: fontsInputs(), args: ['assets', 'fonts', '--out', 'fonts.car'] },
     { name: 'assets with a trailing slash and dot segments', inputs: { 'd/a': text('a') }, args: ['assets', './x/../d//'] },
   ];

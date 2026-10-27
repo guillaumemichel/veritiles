@@ -129,21 +129,23 @@ const source = new PMTilesVectorSource({
 without the pmtiles `Source` shape (`read(offset, length)` → `Uint8Array`).
 Both take:
 
-| option          | type                 | required | description                                                                                                                                                                                                                   |
-| --------------- | -------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cid`           | `string`             | yes      | The anchor CID (CIDv1, base32, sha2-256), codec `dag-cbor` — the proof descriptor.                                                                                                                                            |
-| `source`        | `string \| string[]` | no       | URL(s) of the file itself, tried in order. Range + `206` required. Optional if a hints document supplies the location.                                                                                                        |
-| `proof`         | `string \| string[]` | no       | Proof base URL(s) — the directory holding `root` and the proof tree. Default `${source}.proofs`. Required explicitly if a source has a query.                                                                                 |
-| `hints`         | `string \| string[]` | no       | Routing-hints document URL(s), untrusted (`SPEC.md` §5). An explicit value is always consulted; its URLs join failover after configured ones. The default (`./hints.json` beside the page) is consulted only when a location is missing. Every hinted byte is verified against the anchor exactly as a configured one. |
-| `fetchFn`       | `typeof fetch`       | no       | Replaces global `fetch` — instrumentation/test seam.                                                                                                                                                                          |
-| `maxCacheBytes` | `number`             | no       | Budget for the verified-byte LRU cache (default 64 MiB).                                                                                                                                                                      |
+| option          | type                 | required | description                                                                                                                                                                                                                                                                                                                                               |
+| --------------- | -------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cid`           | `string`             | yes      | The anchor CID (CIDv1, base32, sha2-256), codec `dag-cbor` — the proof descriptor.                                                                                                                                                                                                                                                                        |
+| `source`        | `string \| string[]` | no       | URL(s) of the file itself, tried in order. Range + `206` required. Optional if a hints document or a router supplies the location.                                                                                                                                                                                                                        |
+| `proof`         | `string \| string[]` | no       | Proof base URL(s) — the directory holding `root` and the proof tree. Default `${source}.proofs`. Required explicitly if a source has a query.                                                                                                                                                                                                             |
+| `hints`         | `string \| string[]` | no       | Routing-hints document URL(s), untrusted (`SPEC.md` §5). An explicit document is consulted for every CID, fetched in the background; its URLs follow the configured ones. The default (`./hints.json` beside the page) is consulted only for a CID with nothing configured. Every hinted byte is verified against the anchor exactly as a configured one. |
+| `router`        | `Router \| locate`   | no       | A router, untrusted (`SPEC.md` §6): yields the URLs where a CID's bytes live, in place of the built-in router, whose locations — `source`, `proof`, `hints` — it gets as `defaults`. It may also carry every request and hear what became of it.                                                                                                          |
+| `fetchFn`       | `typeof fetch`       | no       | Replaces global `fetch` — instrumentation, credentials (such as an `Authorization` header for a host that wants one), test seam.                                                                                                                                                                                                                          |
+| `maxCacheBytes` | `number`             | no       | Budget for the verified-byte LRU cache (default 64 MiB).                                                                                                                                                                                                                                                                                                  |
 
-Construction is synchronous and validates the CID; the first read resolves
-locations (configured, then hinted) and fetches `{proof}/root`, hashing it
-against the anchor — after that, every proof file and content slice is verified
-against the digest its parent committed. With configured locations, the first
-proof piece and the first read's range are requested alongside `root` and used
-only once verified. A failed open is retried on the next read.
+Construction is synchronous and validates the CID; the first read takes the
+anchor's locations from the router (the built-in one: configured, then hinted)
+and fetches `{proof}/root`, hashing it against the anchor — after that, every
+proof file and content slice is verified against the digest its parent
+committed. With the built-in router and configured locations, the first
+proof piece and the first read's range are requested alongside `root` and
+used only once verified. A failed open is retried on the next read.
 
 ```js
 // Ship only the anchor; put world's location in a sibling hints.json.
@@ -156,7 +158,10 @@ with, beside the page, `hints.json`:
 {
   "hints": {
     "bafyrei…desc": ["https://node.example/world.pmtiles.proofs"],
-    "bafkr4i…map": ["https://cdn-a.example/world.pmtiles", "https://cdn-b.example/world.pmtiles"]
+    "bafkr4i…map": [
+      "https://cdn-a.example/world.pmtiles",
+      "https://cdn-b.example/world.pmtiles"
+    ]
   }
 }
 ```
@@ -165,6 +170,68 @@ Identity lives in the page (the `cid`), location lives in `hints.json` — each
 changes on its own cadence, and moving hosts is an edit to one JSON file. The
 file's key is the `map` CID the packer prints: its BLAKE3 hash, the same for
 every packing of that file.
+
+A **router** finds locations at runtime instead. Every location comes from
+one: the built-in router follows `source`, `proof` and `hints`; a custom one
+replaces it, receives those as `defaults`, and yields the URLs where a CID's
+bytes live, read one at a time as the client needs them. Over an index that
+speaks [FISL](https://dasl.ing/fisl.html), it takes a few lines:
+
+```js
+const live = (x) => !x.expires || Date.parse(x.expires) > Date.now();
+async function* locate(cid, { defaults }) {
+  yield* defaults; // the page's own locations first; the index only if they fail
+  const res = await fetch(
+    `https://index.example/routing/locations/${cid}/json`,
+  );
+  if (!res.ok) return;
+  const { locations = [] } = await res.json();
+  for (const record of locations.filter(live)) {
+    for (const addr of (record.addrs ?? []).filter(live)) yield addr.url;
+  }
+}
+const source = new veritiles.VerifiedSource({
+  cid: "bafyrei…",
+  router: locate,
+});
+```
+
+A located URL is where the CID's own bytes are: for the anchor, the descriptor
+(`…/world.pmtiles.proofs/root`, with the proof tree beside it); for the `map`
+CID, the archive. The order a router yields in is its strategy — the page's own
+hosts first, as above, its own first, or whichever answer first — and the
+client takes the next location only when the ones it holds have failed. A
+router is as untrusted as a hints document: a wrong URL costs a request, never
+a wrong byte. A location that fails in transport is tried after the others
+until it serves again; one that serves bad bytes is banned for that CID for
+the session, and tried after the others for any other CID. A router that
+wants a wider reputation, by host or across sessions, can build it from
+verdicts (below).
+
+A router may also carry the requests: give it a `fetch` beside `locate` and
+every request to a location goes through it, with a context naming the CID,
+the location, the client's own fetch (`next`), and a `verdict` promise —
+`verified`, `rejected`, `failed` or `unused` — that settles once the client has
+judged the response:
+
+```js
+const router = {
+  locate,
+  async fetch(url, init, { verdict, next }) {
+    const started = performance.now();
+    const res = await next(url, init);
+    verdict.then((v) =>
+      console.log(
+        new URL(url).host,
+        v,
+        Math.round(performance.now() - started),
+        "ms",
+      ),
+    );
+    return res;
+  },
+};
+```
 
 **Methods** (`VerifiedSource`, the pmtiles `Source` contract plus extras):
 
@@ -234,7 +301,8 @@ for tiles. The anchor's codec says what it names:
   `style.json`). The content is self-verifying; no proof exists.
 - **dag-cbor anchor** (`bafyrei…`) — a strict MASL bundle. Its CAR contains
   the authenticated manifest and may include small raw files; every resource
-  maps a path to a raw whole-file CID and declared size.
+  maps a path to a raw whole-file CID and declared size. The manifest block
+  alone (`.masl`, written beside the CAR) serves as its proof too.
 
 ```js
 import { VerifiedAsset, assetProtocol } from "veritiles";
@@ -273,8 +341,10 @@ location**: the registry maps the anchor to a client instance whose URLs
 come from page configuration, so styles stay host-independent and are
 themselves pinnable artifacts.
 
-`VerifiedAsset` options are `cid`, `source`, `proof`, `fetchFn`,
-`maxCacheBytes`, `maxProofBytes`, and `maxFileBytes`. `bytes(path?,
+`VerifiedAsset` options are `cid`, `source`, `proof`, `hints`, `router`,
+`fetchFn`, `maxCacheBytes`, `maxProofBytes`, and `maxFileBytes`. A router
+locates a bundle's anchor at its manifest block (or a CAR holding it) and
+each file at its `src` CID. `bytes(path?,
 { signal? })` returns the file at `path` (`''`, the default, is the artifact
 itself), a fresh copy each call. `NotFoundError` is an **authenticated
 absence** — the artifact provably lacks that path (distinct from a host's
@@ -310,6 +380,8 @@ npm run pack -- assets ./public --out assets.car
 # → a directory totalling ≤ 256 KiB travels whole in the CAR (one fetch
 #   serves the bundle); anything larger emits the manifest alone — the
 #   proof — and clients fetch content from `{base}/{path}`
+# → also writes assets.masl, the manifest block alone: the file a router
+#   names for the anchor
 
 # Check a package before uploading it:
 npm run pack -- verify --cid bafyrei… --file map.pmtiles --proofs map.pmtiles.proofs

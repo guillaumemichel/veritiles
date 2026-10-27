@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { parseCid } from '../src/cid.ts';
 import { deterministicBytes } from './helpers/bytes.ts';
 import { box, concat, fragment } from './helpers/mp4-writer.ts';
 import { writePmtilesArchive } from './helpers/pmtiles-writer.ts';
@@ -152,4 +153,16 @@ test('C-11 an mp4 pack reports one leaf per fragment and no tile group', () => {
   assert.match(packed.stderr, /^proofs: \S+ \(3 leaves, 2 files, descriptor \d+ bytes\)\nmap: [^\n]+\n$/);
   const verified = run('verify', '--cid', packed.stdout.trim(), '--file', video, '--proofs', join(dir, 'c11'));
   assert.equal(verified.stdout, 'verify OK\n', verified.stderr);
+});
+
+test('C-12 pack assets writes the bare manifest block beside the CAR', async () => {
+  const assets = join(dir, 'assets');
+  await mkdir(assets, { recursive: true });
+  await writeFile(join(assets, 'style.json'), '{"version":8}');
+  const result = run('assets', assets, '--out', join(dir, 'site.car'));
+  assert.equal(result.status, 0, result.stderr);
+  const block = await readFile(join(dir, 'site.masl'));
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', block));
+  assert.deepEqual(parseCid(result.stdout.trim(), 'anchor').digest, digest, 'the block is the anchor\'s own bytes');
+  assert.ok(existsSync(join(dir, 'site.car')));
 });

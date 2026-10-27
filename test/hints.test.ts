@@ -285,6 +285,29 @@ test('HR-11: relative URLs resolve against the redirect target, not the requeste
   assert.deepEqual(await r.urlsFor(a), ['https://b.example/mirror/world.pmtiles', 'https://abs.example/x']);
 });
 
+test('HR-12: consulted names the documents fetched, in order; a known document never fetched is not named', async () => {
+  const a = cborCid(28);
+  const OTHER = 'https://other.example/hints.json';
+  const { fetchFn } = serveDocs({ [DOC]: body({}) });
+  const r = new HintResolver({ hints: [DOC, OTHER], fetchFn });
+  assert.deepEqual(r.consulted(), [], 'nothing fetched yet');
+  await r.probe('https://dir.example/');
+  assert.deepEqual(r.consulted(), ['https://dir.example/hints.json']);
+  await r.urlsFor(a);
+  assert.deepEqual(r.consulted(), ['https://dir.example/hints.json', DOC, OTHER]);
+});
+
+test('HR-13: concurrent reads share one fetch per document; load reads every known document', async () => {
+  const a = cborCid(29);
+  const OTHER = 'https://other.example/hints.json';
+  const { fetchFn, requests } = serveDocs({ [DOC]: body({ [a]: ['https://n/p'] }), [OTHER]: body({}) });
+  const r = new HintResolver({ hints: [DOC, OTHER], fetchFn });
+  const [loaded, urls] = await Promise.all([r.load(), r.urlsFor(a), r.urlsFor(a)]).then(([l, u]) => [l, u]);
+  assert.equal(loaded, undefined);
+  assert.deepEqual(urls, ['https://n/p']);
+  assert.deepEqual(requests, [DOC, OTHER], 'each document once');
+});
+
 test('cidToText round-trips a canonical CID string', () => {
   for (const text of [rawCid(0), rawCid(127), cborCid(1), cborCid(200)]) {
     assert.equal(cidToText(parseCid(text, 'roundtrip')), text);

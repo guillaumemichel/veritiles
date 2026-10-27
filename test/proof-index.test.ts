@@ -6,18 +6,18 @@ import { KIND_SHARD } from '../src/proof-format.ts';
 import { ProofIndex } from '../src/proof-index.ts';
 import { RangeSource } from '../src/range-source.ts';
 import { toHex } from '../src/verify.ts';
-import { VerifiedStore } from '../src/verified-store.ts';
 import { deterministicBytes, flipByte, sha256Bytes } from './helpers/bytes.ts';
 import { gatedFetch } from './helpers/gated-fetch.ts';
 import { rangeFetch, type HostOptions } from './helpers/host.ts';
 import { buildProofPackage, type ProofPackage } from './helpers/package.ts';
+import { storeOf } from './helpers/store.ts';
 import { encodeMeta, encodeShard } from '../src/proof-format.ts';
 
 const mapBytes = deterministicBytes(4000, 40);
 const cuts = [100, 900, 2000, 500, 500];
 
 function indexOver(fixture: ProofPackage, opts: HostOptions = {}) {
-  const store = new VerifiedStore([
+  const store = storeOf([
     new RangeSource('.', { fetchFn: rangeFetch(fixture.proofs, opts) }),
   ]);
   const index = new ProofIndex(store, {
@@ -85,7 +85,7 @@ test('leavesFor requests every covering shard before awaiting any, then signals'
     shardCap: 72,
   });
   const gate = gatedFetch(rangeFetch(fixture.proofs));
-  const store = new VerifiedStore([new RangeSource('.', { fetchFn: gate.fetchFn })]);
+  const store = storeOf([new RangeSource('.', { fetchFn: gate.fetchFn })]);
   const index = new ProofIndex(store, { topMeta: decodeDescriptor(fixture.descriptor).topMeta, fileSize: 2000 });
   const lookup = index.leavesFor(250, 750, { onShardsRequested: () => gate.issued.push('signal') });
   await gate.until(() => gate.issued.includes('signal'), 'the signal');
@@ -144,7 +144,7 @@ test('a shard inconsistent with its meta entry is rejected', async () => {
     0,
   );
   const meta = encodeMeta([{ kind: KIND_SHARD, length: 50, digest: sha256Bytes(shard) }]);
-  const store = new VerifiedStore([
+  const store = storeOf([
     new RangeSource('.', { fetchFn: rangeFetch(new Map([['0', shard]])) }),
   ]);
   const index = new ProofIndex(store, { topMeta: meta, fileSize: 50 });
@@ -156,7 +156,7 @@ test('a meta whose coverage disagrees with its parent is rejected', async () => 
   // for a 100-byte file — catches an inconsistent build or swapped files.
   const shard = deterministicBytes(35, 42);
   const meta = encodeMeta([{ kind: KIND_SHARD, length: 50, digest: sha256Bytes(shard) }]);
-  const store = new VerifiedStore([new RangeSource('.', { fetchFn: rangeFetch(new Map()) })]);
+  const store = storeOf([new RangeSource('.', { fetchFn: rangeFetch(new Map()) })]);
   const index = new ProofIndex(store, { topMeta: meta, fileSize: 100 });
   await assert.rejects(index.leavesFor(0, 100), /covers 50 bytes, expected 100/);
 });

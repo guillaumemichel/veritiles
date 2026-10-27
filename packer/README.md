@@ -66,8 +66,9 @@ every fragment (ffmpeg's single-file HLS and DASH outputs) keep the first
 one in the init leaf, so only the first fragment's range spans two leaves.
 
 **assets** walks `<dir>`, writes a MASL bundle CAR to `--out` (default
-`bundle.car`) and prints the manifest anchor. `--type ext=mime[,…]` adds or
-overrides content types by file extension.
+`bundle.car`) and the manifest block alone beside it (`bundle.masl`; an
+`--out` without `.car` gets `.masl` appended), and prints the manifest anchor.
+`--type ext=mime[,…]` adds or overrides content types by file extension.
 
 **verify** checks a package completely: the anchor against `root`, the
 descriptor, every meta and shard, the file length, every leaf digest and the

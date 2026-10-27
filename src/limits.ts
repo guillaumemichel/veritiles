@@ -24,6 +24,10 @@ export const MAX_HINT_URLS_PER_CID = 16; // hinted URLs kept per CID, post-merge
 export const MAX_HINT_DOCS = 16; // documents fetched per client (explicit + probed)
 export const MAX_HINT_URL_BYTES = 4096; // one hinted URL, UTF-8 bytes; longer ignored
 
+// Router limits (SPEC §4, §6), fixed: a router is untrusted, so these bound waste.
+export const MAX_LOCATED_VALUES = 64; // values read per ask of a router, skipped ones included
+export const MAX_FAILED_LOCATIONS = 16; // locations one fetch tries before it gives up
+
 // VerifiedAsset client defaults (whole-file resources).
 export const ASSET_WHOLE_CAP = 262144; // a raw artifact / single whole-file read: 256 KiB
 export const DEFAULT_MAX_FILE_BYTES = 64 * 1024 * 1024; // a bundle file body bound

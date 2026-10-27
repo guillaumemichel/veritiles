@@ -278,7 +278,7 @@ async function importUnixfs(bytes: Uint8Array): Promise<{ root: CID; blocks: { c
   return { root, blocks: postOrder(root, blockstore.recorded) };
 }
 
-// Canonical full-CAR order (SPEC §7): DAG post-order — children left to
+// Canonical full-CAR order (SPEC §8): DAG post-order — children left to
 // right, then the parent — each block once, at its first occurrence. Unlike
 // the importer's put order it is reproducible by a one-pass streaming writer.
 export function postOrder<B extends { cid: CID; bytes: Uint8Array }>(root: CID, blocks: Map<string, B>): B[] {
@@ -1011,8 +1011,16 @@ async function assetsCommand(args: string[]): Promise<void> {
     types.set(value.slice(0, equals).replace(/^\./, '').toLowerCase(), value.slice(equals + 1));
   }
   const packed = await packAssets(directory, { types });
-  await writeFile(opts.out ?? 'bundle.car', packed.car);
+  const out = opts.out ?? 'bundle.car';
+  await writeFile(out, packed.car);
+  await writeFile(blockPath(out), packed.manifest);
   process.stdout.write(`${packed.anchor}\n`);
+}
+
+// The bare manifest block beside the CAR (`bundle.car` → `bundle.masl`): the
+// anchor's own bytes, the URL a router lists for the bundle (SPEC §3.2, §6).
+function blockPath(out: string): string {
+  return `${out.endsWith('.car') ? out.slice(0, -'.car'.length) : out}.masl`;
 }
 
 async function packCommand(args: string[]): Promise<void> {

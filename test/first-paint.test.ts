@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import type { Router, Verdict } from '../src/router.ts';
 import { VerifiedFile } from '../src/verified-file.ts';
 import { deterministicBytes, flipByte } from './helpers/bytes.ts';
 import { gatedFetch, settle } from './helpers/gated-fetch.ts';
@@ -52,11 +53,11 @@ async function opened(pkg: ProofPackage) {
 }
 
 // Two proof hosts for one file, every request logged in issue order.
-function twoProofHosts(pkg: ProofPackage, firstHooks: FileHostHooks) {
+function twoProofHosts(pkg: ProofPackage, firstHooks: FileHostHooks, secondHooks: FileHostHooks = {}) {
   const P1 = 'https://p1/proofs';
   const P2 = 'https://p2/proofs';
   const h1 = servePackage(FILE, pkg.mapBytes, pkg.proofs, firstHooks, P1);
-  const h2 = servePackage(FILE, pkg.mapBytes, pkg.proofs, {}, P2);
+  const h2 = servePackage(FILE, pkg.mapBytes, pkg.proofs, secondHooks, P2);
   const route = ((input: string, init?: RequestInit) =>
     (input.startsWith(P2) ? h2 : h1).fetch(input, init)) as typeof fetch;
   const gate = gatedFetch(route, { holds: () => false });
@@ -141,7 +142,12 @@ test('FP-06: a tampered early 0 is rejected, its proof host banned, and the next
 });
 
 test('FP-07: a missing early 0 is a transport fault: no rejection, no ban', async () => {
-  const { vf, proofs } = twoProofHosts(flat, { proofStatus: (p) => (p === '0' ? 404 : undefined) });
+  let p2Down = false;
+  const { vf, proofs } = twoProofHosts(
+    flat,
+    { proofStatus: (p) => (p === '0' ? 404 : undefined) },
+    { proofStatus: () => (p2Down ? 503 : undefined) },
+  );
   const leaf = flat.leaves[0]!;
   assert.deepEqual(await vf.read(leaf.offset, leaf.length), slice(flat, leaf.offset, leaf.length));
   assert.deepEqual(vf.stats, { verified: 3, rejected: 0 });
@@ -149,7 +155,12 @@ test('FP-07: a missing early 0 is a transport fault: no rejection, no ban', asyn
   assert.deepEqual(proofs(), ['p1/proofs/root', 'p1/proofs/0', 'p1/proofs/0', 'p2/proofs/0']);
   const next = flat.leaves[2]!;
   await vf.read(next.offset, next.length);
-  assert.deepEqual(proofs().slice(4), ['p1/proofs/800'], 'the first host still serves');
+  assert.deepEqual(proofs().slice(4), ['p2/proofs/800'], 'the first host is demoted behind the second');
+  p2Down = true;
+  const last = flat.leaves[4]!;
+  assert.deepEqual(await vf.read(last.offset, last.length), slice(flat, last.offset, last.length));
+  assert.deepEqual(proofs().slice(5), ['p2/proofs/1000', 'p1/proofs/1000'], 'demoted, not banned');
+  assert.equal(vf.stats.rejected, 0);
 });
 
 test('FP-08: a tampered early content body falls back to a verified fetch', async () => {
@@ -216,4 +227,71 @@ test('FP-12: a read clamped at EOF leaves its early body unused', async () => {
   assert.deepEqual(await vf.read(last.offset, 2 * K), slice(flat, last.offset, K));
   assert.deepEqual(issued(), ['root', '0', range(last.offset, 2 * K), '4800', range(last.offset, K)]);
   assert.equal(vf.stats.rejected, 0);
+});
+
+test('FP-13: with a custom router, root and 0 go together to its first location, and no early range', async () => {
+  const seen: { what: string; cid: string; location: string; verdict: Promise<Verdict> }[] = [];
+  const router: Router = {
+    async *locate(cid) {
+      yield cid === flat.anchor ? `${FILE}.proofs/root` : FILE;
+    },
+    fetch: (url, init, context) => {
+      const ranged = new Headers(init.headers).get('Range');
+      seen.push({ what: short(ranged ? `${url} ${ranged}` : url), cid: context.cid, location: context.location, verdict: context.verdict });
+      return context.next(url, init);
+    },
+  };
+  const gate = gatedFetch(servePackage(FILE, flat.mapBytes, flat.proofs).fetch);
+  const vf = new VerifiedFile({ cid: flat.anchor, source: FILE, router, fetchFn: gate.fetchFn });
+  const leaf = flat.leaves[1]!;
+  const read = vf.read(leaf.offset, leaf.length);
+  await gate.until(() => gate.issued.length >= 2, 'root and 0');
+  await settle();
+  assert.deepEqual(issuedOf(gate), ['root', '0'], 'the map is not located before root answers');
+  gate.hold(false);
+  assert.deepEqual(await read, slice(flat, leaf.offset, leaf.length));
+  assert.deepEqual(issuedOf(gate), ['root', '0', range(leaf.offset, leaf.length)]);
+  const told = await Promise.all(seen.map(async (s) => `${s.what} ${s.cid === flat.anchor ? 'anchor' : 'map'} ${short(s.location)} ${await s.verdict}`));
+  assert.deepEqual(told, [
+    `root anchor root verified`,
+    `0 anchor root verified`,
+    `${range(leaf.offset, leaf.length)} map ${FILE} verified`,
+  ]);
+});
+
+test('FP-14: explicit hints no longer hold the open: root, 0 and the early range go first, the document after', async () => {
+  const DOC = 'https://page.example/hints.json';
+  const { fetchFn } = scene([{ fileUrl: FILE, bytes: flat.mapBytes, proofs: flat.proofs }], { [DOC]: {} });
+  const gate = gatedFetch(fetchFn);
+  const vf = new VerifiedFile({ cid: flat.anchor, source: FILE, hints: DOC, fetchFn: gate.fetchFn });
+  const leaf = flat.leaves[1]!;
+  const read = vf.read(leaf.offset, leaf.length);
+  await gate.until(() => gate.issued.length >= 4, 'root, 0, the range and the document');
+  await settle();
+  assert.deepEqual(issuedOf(gate), ['root', '0', range(leaf.offset, leaf.length), DOC]);
+  gate.hold(false);
+  assert.deepEqual(await read, slice(flat, leaf.offset, leaf.length));
+});
+
+function issuedOf(gate: { issued: string[] }): string[] {
+  return gate.issued.map(short);
+}
+
+test('FP-15: a read that fails after the open still drops the early 0 it did not need, as unused', async () => {
+  const verdicts = new Map<string, Promise<Verdict>>();
+  const router: Router = {
+    async *locate(cid) {
+      yield cid === flat.anchor ? `${FILE}.proofs/root` : FILE;
+    },
+    fetch: (url, init, context) => {
+      verdicts.set(short(url), context.verdict);
+      return context.next(url, init);
+    },
+  };
+  const host = servePackage(FILE, flat.mapBytes, flat.proofs, { fileStatus: () => 503 });
+  const vf = new VerifiedFile({ cid: flat.anchor, router, fetchFn: host.fetch });
+  const leaf = flat.leaves[6]!; // shard 1800, not 0
+  await assert.rejects(vf.read(leaf.offset, leaf.length));
+  const settled = await Promise.race([verdicts.get('0')!, new Promise((resolve) => setTimeout(() => resolve('pending'), 100))]);
+  assert.equal(settled, 'unused');
 });

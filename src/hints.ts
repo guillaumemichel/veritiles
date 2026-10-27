@@ -33,7 +33,7 @@ export function parseHintsDocument(text: string, docUrl: string): Map<string, st
     if (cid === null || !Array.isArray(value)) continue;
     const urls: string[] = [];
     for (const element of value) {
-      const url = resolveHintUrl(element, docUrl);
+      const url = resolveLocation(element, docUrl);
       if (url !== null) urls.push(url);
     }
     if (urls.length > 0) out.set(cidToText(cid), urls);
@@ -41,14 +41,15 @@ export function parseHintsDocument(text: string, docUrl: string): Map<string, st
   return out;
 }
 
-// Resolve one array element against the document URL, keep it only if it is a
-// string, resolves to an http(s) URL, and stays within the byte cap; strip a
-// trailing slash so a directory hint composes like a configured base.
-function resolveHintUrl(raw: unknown, docUrl: string): string | null {
+// Resolve one untrusted location — a hints entry against its document's URL,
+// a router's answer absolute — keeping it only if it is a string, resolves to
+// an http(s) URL, and stays within the byte cap; strip a trailing slash so a
+// directory hint composes like a configured base.
+export function resolveLocation(raw: unknown, base?: string): string | null {
   if (typeof raw !== 'string') return null;
   let url: URL;
   try {
-    url = new URL(raw, docUrl);
+    url = new URL(raw, base);
   } catch {
     return null;
   }
@@ -77,12 +78,15 @@ export interface HintResolverOptions {
 
 // Lazy, memoized resolver over one or more hints documents. Fetches nothing
 // until a location is actually needed; memoizes each document's parsed entries
-// on success only (a fetch or parse failure stays retryable); merges matches in
-// document order, configured-then-probed, first-URL-wins, capped per CID.
+// on success only (a fetch or parse failure stays retryable); shares a
+// document's fetch among concurrent readers; merges matches in document order,
+// configured-then-probed, first-URL-wins, capped per CID.
 export class HintResolver {
   #fetchFn: FetchFn;
   #docUrls: string[] = [];
   #docs = new Map<string, Map<string, string[]>>(); // docUrl -> parsed entries (successes only)
+  #fetching = new Map<string, Promise<void>>(); // docUrl -> fetch in flight
+  #attempted = new Set<string>(); // docUrls fetched at least once, in order
 
   constructor({ hints, fetchFn }: HintResolverOptions) {
     this.#fetchFn = fetchFn;
@@ -107,24 +111,44 @@ export class HintResolver {
   // Merged hinted URLs for one CID (canonical text), fetching any not-yet-read
   // documents first. Never throws for the hints layer: a missing or malformed
   // document simply contributes nothing.
-  async urlsFor(cid: string, { signal }: { signal?: AbortSignal } = {}): Promise<string[]> {
-    for (const docUrl of this.#docUrls) await this.#fetchDoc(docUrl, signal);
-    return this.#merge(cid);
+  async urlsFor(cid: string): Promise<string[]> {
+    await this.load();
+    return this.known(cid);
+  }
+
+  // The same from the documents read so far, fetching nothing.
+  known(cid: string): string[] {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const docUrl of this.#docUrls) {
+      for (const url of this.#docs.get(docUrl)?.get(cid) ?? []) {
+        if (seen.has(url)) continue;
+        seen.add(url);
+        out.push(url);
+        if (out.length >= MAX_HINT_URLS_PER_CID) return out;
+      }
+    }
+    return out;
+  }
+
+  // Fetch every known document not read yet.
+  async load(): Promise<void> {
+    for (const docUrl of this.#docUrls) await this.#fetchDoc(docUrl);
   }
 
   // Fetch a directory location's in-directory document, `{dir}/hints.json`
   // (SPEC §5). Its entries then merge on the next urlsFor. Skips past
   // the per-client document cap.
-  async probe(dirUrl: string, { signal }: { signal?: AbortSignal } = {}): Promise<void> {
+  async probe(dirUrl: string): Promise<void> {
     const docUrl = `${dirUrl.replace(/\/+$/, '')}/hints.json`;
     if (!this.#addDoc(docUrl)) return;
-    await this.#fetchDoc(docUrl, signal);
+    await this.#fetchDoc(docUrl);
   }
 
-  // The documents this resolver knows about — for the error naming what was
+  // The documents fetched so far, in order — for the error naming what was
   // consulted when a CID stays unlocated.
   consulted(): string[] {
-    return [...this.#docUrls];
+    return [...this.#attempted];
   }
 
   // Register a document URL if new and under the cap. Returns false only when
@@ -137,12 +161,22 @@ export class HintResolver {
     return true;
   }
 
-  async #fetchDoc(docUrl: string, signal: AbortSignal | undefined): Promise<void> {
-    if (this.#docs.has(docUrl)) return; // memoized success
+  #fetchDoc(docUrl: string): Promise<void> {
+    if (this.#docs.has(docUrl)) return Promise.resolve(); // memoized success
+    let fetching = this.#fetching.get(docUrl);
+    if (fetching === undefined) {
+      this.#attempted.add(docUrl);
+      fetching = this.#readDoc(docUrl).finally(() => this.#fetching.delete(docUrl));
+      this.#fetching.set(docUrl, fetching);
+    }
+    return fetching;
+  }
+
+  async #readDoc(docUrl: string): Promise<void> {
     let text: string;
     let baseUrl = docUrl;
     try {
-      const res = await this.#fetchFn(docUrl, { signal });
+      const res = await this.#fetchFn(docUrl);
       if (!res.ok) {
         void res.body?.cancel?.();
         return;
@@ -159,19 +193,6 @@ export class HintResolver {
     if (parsed !== null) this.#docs.set(docUrl, parsed);
   }
 
-  #merge(cid: string): string[] {
-    const out: string[] = [];
-    const seen = new Set<string>();
-    for (const docUrl of this.#docUrls) {
-      for (const url of this.#docs.get(docUrl)?.get(cid) ?? []) {
-        if (seen.has(url)) continue;
-        seen.add(url);
-        out.push(url);
-        if (out.length >= MAX_HINT_URLS_PER_CID) return out;
-      }
-    }
-    return out;
-  }
 }
 
 // Resolve a configured document spec to an absolute URL. An absolute spec

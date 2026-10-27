@@ -105,9 +105,10 @@ cached; a mismatch discards the whole speculative response. It should request
 a read's covering shards before its speculative range: a shard queued behind
 tile bytes delays every slice it covers.
 
-Before `root` verifies, a client may also request `{proof}/0` from its first
-proof location and, for each read waiting on the open, the exact requested
-range from its first configured content location (never a hinted one, §5).
+Before `root` verifies, a client may also request `{proof}/0` from the proof
+location `root` goes to and, for each read waiting on the open, the exact
+requested range from its first configured content location — with the
+built-in router only, never a hinted location (§5, §6).
 It may use such an early response only in place of the identical request it
 makes later to the same location — `0` once the descent derives it as a
 shard name, the range as that read's speculative fetch — and checks it
@@ -129,7 +130,9 @@ A bundle anchor is a dag-cbor CID of a strict MASL bundle profile. Its proof
 is a CARv1 bag containing the manifest block; optional raw blocks in the bag
 may contain asset bytes. The client locates the manifest by the anchor digest
 and hashes it against the anchor before decoding; a section's claimed CID and
-its position in the bag carry no trust.
+its position in the bag carry no trust. A proof location may instead serve the
+manifest block alone — the anchor's own bytes, as a router names it (§6): a
+body that hashes to the anchor is that block, anything else must be a CAR.
 
 The manifest is a DRISL map no larger than 256 KiB:
 
@@ -164,7 +167,7 @@ The latter mismatch is a content-host fault.
 
 ### 3.3 CAR transport
 
-Proofs are CARv1 only. The header is length-skipped and untrusted. Sections
+Proof bags are CARv1 only. The header is length-skipped and untrusted. Sections
 are minimal-varint length-prefixed binary DASL CIDs followed by bytes; section
 CIDs are untrusted lookup keys until a selected block is hashed. Duplicate
 section digests reject.
@@ -174,20 +177,32 @@ CAR is bounded by `maxProofBytes` before parsing (default 32 MiB).
 
 ## 4. Client behavior
 
-`source` and `proof` locations are hints, never identity. Content sources are
-tried in order; proof sources are tried in order. The default proof location
-is `{source}.proofs` for `VerifiedFile` and `{source}.car` for bundle assets.
-A query-string source derives nothing: it requires an explicit proof URL,
-unless an explicit hints document (§5) supplies the proof location — the
-defaulted document never lifts this requirement.
+`source` and `proof` locations are hints, never identity. A client takes
+every location from a router (§6); the built-in one names the configured
+locations first, in order. The default proof location is `{source}.proofs`
+for `VerifiedFile` and `{source}.car` for bundle assets. A query-string source
+derives nothing: it requires an explicit proof URL, unless an explicit hints
+document (§5) supplies the proof location — the defaulted document never
+lifts this requirement.
+
+A fetch tries a CID's locations in order: those that have not failed, then a
+fresh one from the router, and only once the router has none left, the
+demoted ones, least recently failed first. It fails after 16 failed
+locations. A ban lasts the client session and holds for the CID whose bytes
+the location got wrong: for any other CID that location is only demoted, as
+a URL may serve one file and be named for another. A demotion lasts until
+the location serves again.
 
 - Proof faults (bad framing, failed parent digest, malformed structure,
-  oversized proof) increment `rejected`, fail over to the next proof source,
-  and retry on a later call after all sources fail.
+  oversized proof) increment `rejected` and fail over to the next proof
+  location. A `VerifiedFile` bans the location; a bundle demotes it, so it is
+  tried again, after the others, on a later call.
 - Content faults (wrong length or digest) increment `rejected`, ban that
-  content source for the client session, and fail over.
-- Transport faults (network error, non-2xx, missing derived proof file) do not
-  increment `rejected` and do not ban a source.
+  content location, and fail over.
+- Transport faults (network error, non-2xx, a `200` to a `Range` request,
+  missing derived proof file) do not increment `rejected` and do not ban a
+  location: it moves behind the locations that have not failed, least
+  recently failed first.
 
 `stats` exposes `{ verified, rejected }`. Verified buffers are immutable,
 survive source failover, and every read returns a fresh exact-size copy.
@@ -228,7 +243,7 @@ that CID identifies, and the client's class (§1) fixes the interpretation —
 | CID                             | a URL locates            |
 | ------------------------------- | ------------------------ |
 | dag-cbor anchor, `VerifiedFile` | the proof base directory |
-| dag-cbor anchor, bundle         | the proof CAR file       |
+| dag-cbor anchor, bundle         | the proof CAR (or block) |
 | raw anchor / bundle `src`       | the whole file           |
 | a descriptor's `map`            | the ranged file          |
 
@@ -243,19 +258,22 @@ document pre-positions locations; it never chooses what is read.
 documents directly, defaulting to `./hints.json` beside the page (the same
 convention family as `{source}.proofs`). Every location option is therefore
 optional: the minimal deployment ships only anchors, with a `hints.json`
-beside them. An explicit document is consulted whenever locations resolve, so
-its URLs widen every class's failover behind the configured ones; the
-defaulted document is consulted only when a location class is missing, so the
-default costs nothing on a fully configured client. With no base URL the
-default is treated as absent. Class
-rules are unchanged — a raw anchor still rejects `proof`, and `{cid, proof}`
-alone is valid, its content location coming from the proof directory's own
-document.
+beside them. These are the built-in router's rules (§6). An explicit document
+is consulted for every CID: fetched in the background once the client first
+needs a location, it never holds up a configured one, and its URLs widen every
+class's failover behind the configured ones. The defaulted document is
+consulted only for a CID with nothing configured, so the default costs nothing
+on a fully configured client; with no base URL it is treated as absent. A
+custom router gets all of this as its `defaults`, read only if it reads them.
+Class rules are unchanged — a raw anchor still rejects `proof`, and
+`{cid, proof}` alone is valid, its content location coming from the proof
+directory's own document.
 
 **Discovery.** Any directory holding published artifacts may carry a
 `hints.json` inside itself, so it travels with the data under `rsync`. When a
 location class is missing, the client probes `{dir}/hints.json` for each
-directory it can derive from a location it knows: a directory location itself
+directory it can derive from a location the page names — configured or
+hinted, never one a custom router (§6) found: a directory location itself
 (a proof base, a bundle content base), or the containing directory of a file
 or query-string location (a content file, a proof CAR, a signed base URL). Probes fire only when a class is
 missing, never on the happy path; a 404 is an ordinary transport miss. A
@@ -271,7 +289,7 @@ location), the whole chain bounded by the per-client document cap.
   rejects the whole document.
 - Relative URLs resolve against the document's own URL — the final URL after
   redirects — so a copied or redirected hints file is correct on any mirror.
-  After resolution the scheme must be `http` or `https` (§6 secure-context
+  After resolution the scheme must be `http` or `https` (§7 secure-context
   rules apply), other schemes and URLs over 4,096 UTF-8 bytes are ignored, and
   a trailing `/` is stripped. A URL locating a directory (a `VerifiedFile`
   proof base) is ignored when it carries a query string — derived names cannot
@@ -283,7 +301,7 @@ location), the whole chain bounded by the per-client document cap.
   and never ban. A hinted URL, once merged, is an ordinary source — every §4
   fault rule applies to it unchanged.
 - If a needed CID still has no location after configuration, documents, and
-  probes, the operation fails naming the CID and the documents consulted; the
+  probes, the operation fails naming the CID and the documents fetched; the
   failure is retryable.
 
 | limit                | value             | bounds                                       |
@@ -300,7 +318,86 @@ no version field, no dependants map, no size flag; in-directory `hints.json`
 discovery only. A misread document wastes requests at worst — the same power a
 hostile document already holds — so nothing in this layer fails closed.
 
-## 6. Hosts
+## 6. Routers
+
+A router finds where a CID's bytes may live at runtime — a content-routing
+index, a gateway, a lookup table. A client takes every location from one: the
+built-in router reads the page's own configuration (§4) and hints documents
+(§5); a custom router replaces it:
+
+```
+router.locate(cid, { defaults }) → URLs, best first, as an async iterable
+router.fetch(url, init, context) → Promise<Response>      (optional)
+```
+
+A function alone is shorthand for `{ locate }`. `locate` receives a CID in
+canonical text form (§1) and yields absolute URLs; an array, or a promise of
+one, is read as well. `defaults` yields what the built-in router would for the
+same CID — configured locations, then hinted, then probed — and is read only
+if the router reads it. A custom router is authoritative, and the order it
+yields in is its strategy: the page's own locations first and its own after,
+its own first, or whichever come first. Like a hints document, a router is
+outside the root of trust: every byte fetched from a location it yields
+verifies against the anchor chain exactly as a configured one, so a hostile
+router can misdirect a request, never alter a result that verifies.
+
+**Entry semantics.** A located URL is the URL of the CID's own bytes. This is
+the rule of [FISL](https://dasl.ing/fisl.html), so an index that speaks it
+answers as is:
+
+| CID                             | a URL locates                  | the client reads                         |
+| ------------------------------- | ------------------------------ | ---------------------------------------- |
+| dag-cbor anchor, `VerifiedFile` | the descriptor, `{proof}/root` | the proof tree beside it                 |
+| dag-cbor anchor, bundle         | the manifest block (§3.2)      | the manifest; a CAR there is read as one |
+| raw anchor / bundle `src`       | the whole file                 | the file                                 |
+| a descriptor's `map`            | the ranged file                | its byte ranges                          |
+
+Proof names derive from `root`'s directory (§2.2), so a `VerifiedFile` anchor
+URL whose path does not end in `/root`, or that carries a query string, is
+skipped. Lookups are verify-then-locate, as for hints: `locate` is called for
+an anchor at open, for `map` once the descriptor names it, and for a `src`
+once the manifest names it; a file already verified needs no location.
+
+**Reading.**
+
+- A client reads a CID's locations lazily and keeps them for its session. A
+  fetch takes the next value only when no location it holds is left to try
+  (§4); concurrent fetches share one read, and a speculative range (§2.3)
+  uses the held locations only.
+- A value that is not an absolute `http` or `https` URL of at most 4,096
+  UTF-8 bytes is skipped, a trailing `/` is stripped, and the first
+  occurrence of a location wins. A value `defaults` yielded passes as it is,
+  since a page may configure relative or other-scheme locations.
+- A router that throws ends its stream, as does reading 64 values from one
+  call. Once the stream has ended and every location failed, the next fetch
+  calls `locate` again.
+
+**Transport.** A router with `fetch` carries every request to every location
+of every CID, `defaults`' included, and answers as `fetch` would. Its context
+names the CID read (the anchor for proof files and a raw file, the map for
+its byte ranges, the `src` for a bundle file), the location as yielded (`{proof}/root` for
+every file of that proof tree), `next` (the client's own fetch), and
+`verdict`, a promise of what became of the response:
+
+| verdict    | the response                                                                          |
+| ---------- | ------------------------------------------------------------------------------------- |
+| `verified` | passed verification and was used                                                      |
+| `rejected` | failed verification (§4); a speculative body is only passed over, its range refetched |
+| `failed`   | failed in transport (§4)                                                              |
+| `unused`   | was dropped unjudged: aborted, or sent early and not needed by the first read         |
+
+A router thereby learns which hosts serve, how fast, and which serve bad
+bytes, and it may add credentials to a request or refuse one. With a custom
+router, a `VerifiedFile` sends no early range (§2.3): the map has no location
+before the descriptor verifies.
+
+| limit                      | value             | bounds                  |
+| -------------------------- | ----------------- | ----------------------- |
+| values read per `locate`   | 64                | skipped values included |
+| failed locations per fetch | 16                | then the fetch fails    |
+| URL length                 | 4,096 UTF-8 bytes | per URL, longer ignored |
+
+## 7. Hosts
 
 | requirement                                               | why                                                                                   |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------- |
@@ -319,7 +416,7 @@ compression is allowed (they are never hashed), and — being mutable — they
 should carry a modest `Cache-Control` (minutes to hours), not `immutable`.
 Because they are routinely fetched cross-origin, CORS must allow GET.
 
-## 7. Publishing
+## 8. Publishing
 
 The reference packer is a repository development tool; it is not part of the
 published client library package. Run it from a clone of this repository after
@@ -358,13 +455,15 @@ boxes: everything before the first fragment (`ftyp`, `moov`, a global
 the last `mdat` (an `mfra`) form a last leaf. A player that reads each
 fragment at the range its `sidx` lists fetches exactly one leaf.
 
-`pack assets <dir>` writes a MASL CAR and prints its dag-cbor manifest anchor.
+`pack assets <dir>` writes a MASL CAR, the manifest block alone beside it
+(`bundle.car` → `bundle.masl`: the file a router names for the anchor, §6), and
+prints its dag-cbor manifest anchor.
 When the directory's unique file contents total at most 256 KiB, every file
 travels in the CAR as a raw section, each distinct block once. Otherwise the
 CAR carries the manifest alone and files are fetched whole from the content
 base, verified against the manifest's raw `src` CID.
 
-## 8. IPFS and DASL interoperability
+## 9. IPFS and DASL interoperability
 
 DASL/atproto compatibility is the primary format rule: anchors, manifest
 links, and CAR sections accepted by clients are raw or dag-cbor CIDs only.
@@ -395,11 +494,11 @@ gateway URLs:
 
 Hints keys stay the CIDs of §1 (§5): the client looks up only CIDs it already
 holds or has verified, and the dag-pb CID rides inside the URL value, which
-is opaque to it. §6 host rules apply unchanged — the deserialized endpoint
+is opaque to it. §7 host rules apply unchanged — the deserialized endpoint
 (never `?format=raw`), identity encoding, CORS, and `Range` + `206` on the
 content file.
 
-## 9. Non-goals
+## 10. Non-goals
 
 Availability, freshness, confidentiality, and privacy of access patterns are
 non-goals: a host can withhold service; anchors never change (pair a naming

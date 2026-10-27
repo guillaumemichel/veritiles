@@ -21,7 +21,9 @@ export async function readBody(res: Response, limit: number): Promise<Uint8Array
     }
     parts.push(value);
   }
-  if (parts.length === 1) return parts[0]!;
+  // A copy even of a single chunk: whoever produced it could rewrite it after
+  // it verified.
+  if (parts.length === 1) return parts[0]!.slice();
   const out = new Uint8Array(size);
   let pos = 0;
   for (const p of parts) {

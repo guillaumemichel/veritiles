@@ -1,23 +1,28 @@
 // The public entry point for range-verified files (PLAN-shards §1): a file
 // anchored to a dag-cbor proof descriptor, read over one or more untrusted
-// hosts. Construction is synchronous; the first read lazily resolves locations
-// (configured, then hinted — SPEC §5), fetches `{proof}/root` (verifying
-// it against the anchor — the one hash at open), and a failed open stays
-// retryable. The open overlaps its round trip with the first shard and the
-// first reads' exact ranges, each verified when used like any fresh
-// response. Reads clamp at EOF and return a fresh, exact-size copy — the
-// content type (PMTiles, video, any file) is irrelevant to this class; per-type
-// knowledge lives entirely in the packer.
+// hosts. Construction is synchronous; the first read opens the file: it asks
+// the router where the anchor's bytes live (SPEC §6; the built-in router
+// follows the page's configuration and hints documents, SPEC §5), fetches
+// `{proof}/root` (verifying it against the anchor — the one hash at open),
+// then asks where the map lives. A failed open stays retryable. The open
+// overlaps its round trip with the first shard and — with the built-in
+// router, on a page that names its own source — the first reads' exact
+// ranges, each verified when used like any fresh response. Reads clamp at EOF and return a fresh, exact-size copy
+// — the content type (PMTiles, video, any file) is irrelevant to this class;
+// per-type knowledge lives entirely in the packer.
 
+import { abortable } from './abortable.ts';
 import { type Cid, cidToText, parseFileAnchor } from './cid.ts';
+import { DefaultRouter } from './default-router.ts';
 import { openDescriptor } from './descriptor.ts';
 import { EarlySource } from './early-source.ts';
-import { containingDir, HintResolver } from './hints.ts';
 import { DEFAULT_MAX_CACHE_BYTES, PROOF_CACHE_BYTES } from './limits.ts';
+import { Locator } from './locations.ts';
 import { SHARD_FILE_CAP } from './proof-format.ts';
 import { ProofIndex } from './proof-index.ts';
 import { type FetchFn, RangeSource } from './range-source.ts';
 import { RangedReader } from './ranged-reader.ts';
+import { type Router, type RouterOption, toRouter } from './router.ts';
 import { type ByteSource, VerifiedStore, type VerifyStats } from './verified-store.ts';
 
 export interface VerifiedFileOptions {
@@ -25,25 +30,32 @@ export interface VerifiedFileOptions {
   cid: string;
   /**
    * URL(s) of the file itself, tried in order. Range + 206 required. Optional:
-   * a hints document (below) may supply content locations instead.
+   * a hints document (below) or a router may supply content locations instead.
    */
   source?: string | string[];
   /**
    * Proof base URL(s) — the directory holding `root` and the meta/shard
    * tree — tried in order. Default `{source}.proofs` per source; an
    * explicit value is required when a source URL carries a query string
-   * (unless a hints document supplies the proof base).
+   * (unless an explicit hints document supplies the proof base).
    */
   proof?: string | string[];
   /**
-   * Routing-hints document URL(s), untrusted (SPEC §5). An explicit value is
-   * consulted whenever locations resolve and its URLs join failover after the
-   * configured ones; the default (`./hints.json` beside the page) is consulted
-   * only when a location is missing. Every hinted byte is verified against the
-   * anchor exactly as a configured one.
+   * Routing-hints document URL(s), untrusted (SPEC §5). An explicit document
+   * is consulted for every CID, fetched in the background from the open on;
+   * its URLs follow the configured ones. The default (`./hints.json` beside
+   * the page) is consulted only for a CID with nothing configured. Every
+   * hinted byte is verified against the anchor exactly as a configured one.
    */
   hints?: string | string[];
-  /** Replaces global fetch — instrumentation and test seam. */
+  /**
+   * Router, untrusted (SPEC §6): where a CID's bytes may live. It replaces
+   * the built-in router, which it gets as `defaults` (the locations `source`,
+   * `proof` and `hints` name), and may carry every request, hearing what
+   * became of each. Every routed byte is verified like a configured one.
+   */
+  router?: RouterOption;
+  /** Replaces global fetch — instrumentation, credentials, test seam. */
   fetchFn?: FetchFn;
   /** Budget for the verified-byte LRU cache (default 64 MiB). */
   maxCacheBytes?: number;
@@ -53,58 +65,46 @@ export class VerifiedFile {
   #cid: string;
   #anchor: Cid;
   #anchorText: string;
-  #sources: string[];
-  #configuredProofBases: string[] | undefined;
-  #resolver: HintResolver;
-  #hintsExplicit: boolean;
+  #router: Router | undefined;
+  #locator: Locator;
   #fetch: FetchFn;
   #maxCacheBytes: number;
   #stats: VerifyStats = { verified: 0, rejected: 0 };
   #reader: Promise<RangedReader> | undefined;
   #built = false;
-  // The first configured content source, kept across opens: reads issued
-  // before the reader is built send their ranges to it early.
-  #firstContent: EarlySource | undefined;
+  // With the built-in router, the first configured source, kept across
+  // opens: reads issued before the reader is built send their ranges to it
+  // early.
+  #firstContent: { url: string; source: EarlySource } | undefined;
+  // The open's early `0`, until the first read has had its chance to claim it.
+  #earlyProof: EarlySource | undefined;
   #size: number | undefined;
 
   constructor(options: VerifiedFileOptions) {
-    const { cid, source, proof, hints, fetchFn, maxCacheBytes } = options;
+    const { cid, source, proof, hints, router, fetchFn, maxCacheBytes } = options;
     this.#anchor = parseFileAnchor(cid);
     this.#cid = cid;
     this.#anchorText = cidToText(this.#anchor);
     this.#fetch = fetchFn ?? ((...args: Parameters<FetchFn>) => globalThis.fetch(...args));
     this.#maxCacheBytes = maxCacheBytes ?? DEFAULT_MAX_CACHE_BYTES;
-    this.#hintsExplicit = hints !== undefined;
+    this.#router = toRouter(router);
 
     const sources = source === undefined ? [] : Array.isArray(source) ? source : [source];
     if (source !== undefined && (sources.length === 0 || sources.some((s) => typeof s !== 'string' || s.length === 0))) {
       throw new Error('source must be a URL or a non-empty list of URLs');
     }
-    this.#sources = sources;
-    if (sources.length > 0) this.#firstContent = new EarlySource(new RangeSource(sources[0]!, { fetchFn: this.#fetch }));
-    this.#configuredProofBases = this.#configuredProof(sources, proof);
-    this.#resolver = new HintResolver({ hints, fetchFn: this.#fetch });
-  }
-
-  // Proof bases from configuration alone: explicit `proof`, else `{source}.proofs`
-  // derived from each source, else undefined — a hints document must supply them
-  // (SPEC §5). A query-string source with no explicit proof is a config
-  // error, left early and loud, unless explicit hints defer the question to open.
-  #configuredProof(sources: string[], proof: string | string[] | undefined): string[] | undefined {
-    if (proof !== undefined) {
-      const urls = Array.isArray(proof) ? proof : [proof];
-      if (urls.length === 0 || urls.some((u) => typeof u !== 'string' || u.length === 0)) {
-        throw new Error('proof must be a URL or a non-empty list of URLs');
-      }
-      return urls;
+    const defaults = new DefaultRouter({
+      anchor: this.#anchorText,
+      kind: 'ranged',
+      sources,
+      proof,
+      hints,
+      fetchFn: this.#fetch,
+    });
+    this.#locator = new Locator(this.#router, defaults);
+    if (this.#router === undefined && sources.length > 0) {
+      this.#firstContent = { url: sources[0]!, source: new EarlySource(new RangeSource(sources[0]!, { fetchFn: this.#fetch })) };
     }
-    if (sources.length === 0) return undefined;
-    const bad = sources.find((s) => s.includes('?'));
-    if (bad !== undefined) {
-      if (this.#hintsExplicit) return undefined;
-      throw new Error(`source ${bad} has a query string; an explicit proof URL is required`);
-    }
-    return sources.map((s) => `${s}.proofs`);
   }
 
   get cid(): string {
@@ -125,16 +125,24 @@ export class VerifiedFile {
     await this.#open();
   }
 
-  // Verified bytes for [offset, offset + length), clamped to EOF.
+  // Verified bytes for [offset, offset + length), clamped to EOF. An abort
+  // stops this read waiting for the open, which goes on for the others.
   async read(offset: number, length: number, { signal }: { signal?: AbortSignal } = {}): Promise<Uint8Array> {
     signal?.throwIfAborted();
     const opening = this.#open();
     const release = this.#built ? undefined : this.#sendEarly(offset, length, signal);
+    let opened = false;
     try {
-      const reader = await opening;
+      const reader = await abortable(opening, signal);
+      opened = true;
       return await reader.read(offset, length, { signal });
     } finally {
       release?.();
+      // A read past the open has had its chance at the early `0`: drop what is left.
+      if (opened) {
+        this.#earlyProof?.dropUnclaimed();
+        this.#earlyProof = undefined;
+      }
     }
   }
 
@@ -145,12 +153,12 @@ export class VerifiedFile {
   // when the read settles.
   #sendEarly(offset: number, length: number, signal: AbortSignal | undefined): (() => void) | undefined {
     if (offset < 0 || length <= 0) return undefined;
-    return this.#firstContent?.sendRange('', offset, length, signal);
+    return this.#firstContent?.source.sendRange('', offset, length, signal);
   }
 
   // Lazy memoized open. A failure clears the memo so the next read retries
-  // (failed hint fetches are not memoized); deliberately not tied to any
-  // caller's abort signal.
+  // (a router whose locations all failed is asked again); deliberately not
+  // tied to any caller's abort signal.
   #open(): Promise<RangedReader> {
     if (this.#reader === undefined) {
       this.#reader = this.#build();
@@ -161,122 +169,79 @@ export class VerifiedFile {
     return this.#reader;
   }
 
-  // Resolve proof locations, verify the descriptor, seed the proof index,
-  // resolve content locations, build the read loop. Configured proof
-  // locations need no await, so `root` and `0` leave before the first read's
-  // early range.
+  // Verify the descriptor at the anchor's locations, seed the proof index,
+  // locate the map, build the read loop. With a location held already, `root`
+  // and `0` leave before the first read's early range.
   async #build(): Promise<RangedReader> {
-    const proofBases = this.#knownProofBases() ?? (await this.#resolveProofBases());
-    const [first, ...rest] = proofBases.map((base) => new RangeSource(base, { fetchFn: this.#fetch }));
-    const firstProof = new EarlySource(first!);
-    const proofStore = new VerifiedStore([firstProof, ...rest], { maxCacheBytes: PROOF_CACHE_BYTES, stats: this.#stats });
-    const opening = openDescriptor(this.#anchor, proofStore);
+    const anchor = this.#locator.for(this.#anchorText, { kind: 'proof', label: this.#cid, accept: isProofRoot });
     // A top meta that starts with a shard names it `0` (it starts the file):
-    // fetch it alongside `root`; the descent claims it if it needs it.
-    firstProof.sendWhole('0', SHARD_FILE_CAP);
-    const descriptor = await opening;
-    const index = new ProofIndex(proofStore, {
-      topMeta: descriptor.topMeta,
-      fileSize: descriptor.mapSize,
-    });
-    const size = await index.open();
-    this.#size = size;
-    const contentStore = await this.#openContentStore(descriptor.mapCid, proofBases);
-    this.#built = true;
-    return new RangedReader(contentStore, index, '', size);
-  }
-
-  // Proof bases from configuration alone, when no hints document has a say.
-  #knownProofBases(): string[] | undefined {
-    if (this.#hintsExplicit || this.#configuredProofBases === undefined) return undefined;
-    return dedupe(this.#configuredProofBases);
-  }
-
-  // Proof bases when hints have a say: configured/derived first, completed by
-  // hints[anchor] (a proof base carries `{u}/root`, so a query string has no
-  // clean anchor and is dropped). Hints are consulted when explicit, or when
-  // configuration derives nothing. Still empty, probe the containing directory
-  // of each configured source (SPEC §5 discovery — a file location's directory
-  // may hold its hints) before failing. One round is complete discovery for
-  // this class: before the descriptor verifies, the anchor is the only CID the
-  // client may look up (§5 verify-then-locate), and any hints[anchor] hit
-  // fills the class — there is nothing further to chain through.
-  async #resolveProofBases(): Promise<string[]> {
-    const configured = this.#configuredProofBases ?? [];
-    let bases = dedupe([...configured, ...(await this.#lookupProofBases())]);
-    if (bases.length === 0 && this.#sources.length > 0) {
-      for (const source of this.#sources) await this.#resolver.probe(containingDir(source));
-      bases = await this.#lookupProofBases();
+    // fetch it right behind `root`, where `root` goes first — at once if
+    // `root` left at once, else as soon as it leaves. The first read claims
+    // it if it needs it.
+    let early = undefined as EarlySource | undefined; // set in a callback: the cast stops TS narrowing it
+    let opening = true;
+    const sourceFor = (location: string): ByteSource => {
+      const source = new EarlySource(this.#proofSource(location));
+      if (early === undefined) {
+        early = this.#earlyProof = source;
+        if (!opening) queueMicrotask(() => source.sendWhole('0', SHARD_FILE_CAP));
+      }
+      return source;
+    };
+    const proofStore = new VerifiedStore({ locations: anchor, sourceFor }, { maxCacheBytes: PROOF_CACHE_BYTES, stats: this.#stats });
+    const described = openDescriptor(this.#anchor, proofStore);
+    opening = false;
+    early?.sendWhole('0', SHARD_FILE_CAP);
+    try {
+      const descriptor = await described;
+      const index = new ProofIndex(proofStore, {
+        topMeta: descriptor.topMeta,
+        fileSize: descriptor.mapSize,
+      });
+      const size = await index.open();
+      this.#size = size;
+      const contentStore = await this.#contentStore(cidToText(descriptor.mapCid));
+      this.#built = true;
+      return new RangedReader(contentStore, index, '', size);
+    } catch (err) {
+      early?.dropUnclaimed();
+      throw err;
     }
-    if (bases.length === 0) throw this.#unlocated('proof', this.#cid);
-    return bases;
   }
 
-  async #lookupProofBases(): Promise<string[]> {
-    return (await this.#resolver.urlsFor(this.#anchorText)).filter((u) => !u.includes('?'));
-  }
-
-  // Content sources: configured, plus hints[map] (consulted when explicit or
-  // when no source is configured). Missing everywhere, probe the known proof
-  // directories for an in-directory document (SPEC §5) before failing.
-  // The proof files share the stats object (one {verified, rejected} pair per
-  // client) but each store gets its own small LRU: proofs are tiny and immutable.
-  async #openContentStore(mapCid: Cid, proofBases: string[]): Promise<VerifiedStore> {
-    const mapText = cidToText(mapCid);
-    const configured = this.#sources;
-    const hinted = this.#hintsExplicit || configured.length === 0 ? await this.#resolver.urlsFor(mapText) : [];
-    let urls = dedupe([...configured, ...hinted]);
-    if (urls.length === 0) urls = await this.#probeContent(mapText, proofBases);
-    if (urls.length === 0) throw this.#unlocated('content', mapText);
+  // The map's store, once it has a location: none at all fails the open, and
+  // the next open asks the router again. The proof files and the map file
+  // share the stats object (one {verified, rejected} pair per client) but
+  // each store gets its own LRU: proofs are tiny and immutable.
+  async #contentStore(mapText: string): Promise<VerifiedStore> {
+    const content = this.#locator.for(mapText, { kind: 'content' });
+    if (!content.held().length) await content.pull();
+    if (!content.held().length) {
+      content.exhausted();
+      throw content.unlocated();
+    }
     return new VerifiedStore(
-      urls.map((url) => this.#contentSource(url)),
+      { locations: content, sourceFor: (location) => this.#contentSource(location, mapText) },
       { maxCacheBytes: this.#maxCacheBytes, stats: this.#stats },
     );
   }
 
+  // `{proof}/root` locates the descriptor; the proof tree is its directory.
+  #proofSource(location: string): ByteSource {
+    const base = location.slice(0, -'/root'.length);
+    return new RangeSource(base, { fetchFn: this.#fetch, route: { router: this.#router, cid: this.#anchorText, location } });
+  }
+
   // The first configured source holds the early reads' responses: reuse it,
   // so their speculation finds them.
-  #contentSource(url: string): ByteSource {
-    if (url === this.#sources[0] && this.#firstContent !== undefined) return this.#firstContent;
-    return new RangeSource(url, { fetchFn: this.#fetch });
-  }
-
-  // A directory a client knows may carry `{u}/hints.json` (SPEC §5).
-  // Probe the known proof directories for the missing content location, then
-  // any proof directories those documents name in turn (location → document →
-  // location), until the class is filled, directories run out, or the resolver's
-  // document cap trips. Probes never fire on the happy path.
-  async #probeContent(mapText: string, proofBases: string[]): Promise<string[]> {
-    const probed = new Set<string>();
-    let dirs = proofBases;
-    while (dirs.length) {
-      for (const dir of dirs) {
-        if (probed.has(dir)) continue;
-        probed.add(dir);
-        await this.#resolver.probe(dir);
-      }
-      const urls = await this.#resolver.urlsFor(mapText);
-      if (urls.length) return urls;
-      const learned = (await this.#resolver.urlsFor(this.#anchorText)).filter((u) => !u.includes('?'));
-      dirs = learned.filter((dir) => !probed.has(dir));
-    }
-    return [];
-  }
-
-  #unlocated(kind: string, cid: string): Error {
-    const docs = this.#resolver.consulted();
-    const where = docs.length ? docs.join(', ') : 'no hints documents';
-    return new Error(`no ${kind} location for ${cid}; consulted ${where}`);
+  #contentSource(location: string, mapText: string): ByteSource {
+    if (location === this.#firstContent?.url) return this.#firstContent.source;
+    return new RangeSource(location, { fetchFn: this.#fetch, route: { router: this.#router, cid: mapText, location } });
   }
 }
 
-function dedupe(urls: string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const url of urls) {
-    if (seen.has(url)) continue;
-    seen.add(url);
-    out.push(url);
-  }
-  return out;
+// A location's bytes root the derived proof tree only as `{proof}/root`
+// (SPEC §2.2), and only without a query string.
+function isProofRoot(url: string): boolean {
+  return url.endsWith('/root') && !url.includes('?');
 }

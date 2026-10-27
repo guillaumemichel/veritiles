@@ -4,6 +4,64 @@ All notable changes to this project are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (pre-1.0: minor = feature, patch =
 fix).
 
+## [Unreleased]
+
+### Added
+
+- **Routers** ([`SPEC.md` §6](https://github.com/guillaumemichel/veritiles/blob/v0.6.0/SPEC.md#6-routers)): every location now comes from a router. The
+  built-in one follows `source`, `proof` and `hints` as before; a `router`
+  option on `VerifiedSource`, `VerifiedFile` and `VerifiedAsset` replaces it
+  with your own — a content-routing index, a gateway, a table — so a page can
+  ship only its anchor and find hosts at runtime. A router's `locate(cid,
+  { defaults })` yields the URLs of a CID's bytes, best first, and gets the
+  built-in router's locations as `defaults`, so its yield order is its
+  strategy: the page's own hosts first, its own first, or whichever answer
+  first. The client reads the stream lazily, taking the next location only
+  when the ones it holds have failed, and asks again once all have. A located
+  URL is where the CID's own bytes are, the rule of
+  [FISL](https://dasl.ing/fisl.html): for a ranged file's anchor that is
+  `{proof}/root`, and the client reads the proof tree beside it. A router may
+  also carry the requests (`fetch`): each comes with the CID, the location,
+  the client's own fetch, and a verdict — `verified`, `rejected`, `failed` or
+  `unused` — so a router learns which hosts serve, how fast, and which lie,
+  and can add credentials. Routers are as untrusted as hints documents: every
+  byte still verifies against the anchor. The README shows a router over a
+  FISL index in a few lines.
+- `pack assets` also writes the manifest block alone beside the CAR
+  (`bundle.car` → `bundle.masl`): the anchor's own bytes, the file a router
+  names for a bundle. Clients accept a bare manifest block wherever they read
+  a bundle proof: a body that hashes to the anchor is the block, anything else
+  is read as a CAR.
+
+### Changed
+
+- **A failing location is demoted.** A location that fails in transport — a
+  network error, a non-2xx status, a `200` to a `Range` request, a missing
+  proof file — now moves behind the ones that have not failed until it serves
+  again, instead of being tried first on every read; a fetch asks the router
+  for a fresh location before going back to it, and gives up after 16 failed
+  locations. A location that serves wrong bytes is still banned, now for the
+  client's whole session (a failed open no longer forgets it), and only for
+  the CID it got wrong: for any other it is demoted.
+- **Explicit hints documents no longer hold up the open.** A page that
+  configures its locations and names a `hints` document sends `root`, the
+  first proof piece and the first read's range at once, and fetches the
+  document in the background; its URLs still back up the configured ones.
+- A bundle file that fails verification at a configured base bans that
+  file's URL, not the whole base: the base still serves the bundle's other
+  files.
+- The router specification lands in `SPEC.md` as **§6 Routers**; the previous
+  §6–§9 (Hosts, Publishing, IPFS interoperability, Non-goals) are renumbered
+  §7–§10.
+
+### Fixed
+
+- A response body that arrives in one piece is copied before it is verified:
+  a `fetchFn` (or a router's `fetch`) that reuses its buffers can no longer
+  change bytes after they verified.
+- A read whose signal aborts stops waiting for a file's open or a bundle's
+  manifest; the open goes on for other reads.
+
 ## [0.5.0] — Planet scale
 
 **Planet scale.** A Rust port of the packer packs files of any size — a
@@ -192,7 +250,7 @@ anchor.
 
 ### Added
 
-- **Routing hints** (`SPEC.md` §5): an untrusted `hints.json` maps CIDs to
+- **Routing hints** ([`SPEC.md` §5](https://github.com/guillaumemichel/veritiles/blob/v0.4.0/SPEC.md#5-routing-hints)): an untrusted `hints.json` maps CIDs to
   candidate locations, so a page can ship only its anchor and keep host
   locations in a sibling file that changes on its own cadence. Every byte
   fetched through a hint is still verified against the anchor exactly as a

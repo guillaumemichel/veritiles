@@ -9,9 +9,10 @@ import { test } from 'node:test';
 
 import { RangedReader, type Leaf, type LeafIndex } from '../src/ranged-reader.ts';
 import { RangeSource } from '../src/range-source.ts';
-import { VerifiedStore } from '../src/verified-store.ts';
+import type { Router, Verdict } from '../src/router.ts';
 import { deterministicBytes, flipByte, sha256Hex } from './helpers/bytes.ts';
 import { rangeFetch, type HostOptions } from './helpers/host.ts';
+import { storeOf } from './helpers/store.ts';
 
 // A LeafIndex driven by a cut list: cold until leavesFor runs (like a real
 // multi-level descent), warm after. Never fetches; leaves come from the cuts.
@@ -48,7 +49,7 @@ class FakeIndex implements LeafIndex {
 const PATH = 'map.bin';
 
 function open(data: Uint8Array, cuts: number[], opts: HostOptions = {}, index: LeafIndex = new FakeIndex(data, cuts)) {
-  const store = new VerifiedStore([new RangeSource('.', { fetchFn: rangeFetch(new Map([[PATH, data]]), opts) })]);
+  const store = storeOf([new RangeSource('.', { fetchFn: rangeFetch(new Map([[PATH, data]]), opts) })]);
   return { reader: new RangedReader(store, index, PATH, data.length), store };
 }
 
@@ -178,4 +179,44 @@ test('a range response longer than the run is cut off before hashing', async () 
     assert.match((err.errors[0] as Error).message, /exceeds expected length/);
     return true;
   });
+});
+
+// --- Verdicts (SPEC §6): what each read made of its speculative body ---
+
+// A reader whose requests a router carries, logging each range with its verdict.
+function openRouted(data: Uint8Array, cuts: number[], opts: HostOptions = {}) {
+  const log: { range: string; verdict: Promise<Verdict> }[] = [];
+  const router: Router = {
+    locate: () => [],
+    fetch: (url, init, context) => {
+      log.push({ range: new Headers(init.headers).get('Range') ?? 'whole', verdict: context.verdict });
+      return context.next(url, init);
+    },
+  };
+  const source = new RangeSource('.', { fetchFn: rangeFetch(new Map([[PATH, data]]), opts), route: { router, cid: 'bafkmap', location: '.' } });
+  const reader = new RangedReader(storeOf([source]), new FakeIndex(data, cuts), PATH, data.length);
+  const verdicts = async () => Promise.all(log.map(async ({ range, verdict }) => `${range} ${await verdict}`));
+  return { reader, verdicts };
+}
+
+test('RR-V1: an adopted speculative body is verified; so is a warm read\'s run', async () => {
+  const data = deterministicBytes(3000, 33);
+  const { reader, verdicts } = openRouted(data, [100, 900, 2000]);
+  await reader.read(100, 900);
+  await reader.read(1000, 2000);
+  assert.deepEqual(await verdicts(), ['bytes=100-999 verified', 'bytes=1000-2999 verified']);
+});
+
+test('RR-V2: a speculative body the read cannot use is unused; a tampered one is rejected', async () => {
+  const data = deterministicBytes(3000, 34);
+  const misaligned = openRouted(data, [100, 900, 2000]);
+  await misaligned.reader.read(0, 150);
+  assert.deepEqual((await misaligned.verdicts()).sort(), ['bytes=0-149 unused', 'bytes=0-999 verified']);
+
+  let calls = 0;
+  const tampered = openRouted(data, [100, 900, 2000], {
+    tamper: (path, range, bytes) => (path === PATH && range && ++calls === 1 ? flipByte(bytes) : bytes),
+  });
+  await tampered.reader.read(100, 900);
+  assert.deepEqual(await tampered.verdicts(), ['bytes=100-999 rejected', 'bytes=100-999 verified']);
 });

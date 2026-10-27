@@ -47,12 +47,17 @@ the release's headline in a few words (e.g. `Routing hints`) and becomes the
 GitHub Release title via the §6 extraction command. Reuse the same text as the
 annotated tag message and the GitHub Release body.
 
+Link a `SPEC.md` section at the release tag, as in the template: the link keeps
+showing the spec the entry describes after sections are renumbered, and an
+absolute URL works in the tag and Release bodies too. A link in `[Unreleased]`
+names the expected next tag; check it once the version is settled.
+
 ```markdown
 ## [X.Y.Z] — Short title
 
 ### Added
 
-- …
+- **Feature** ([`SPEC.md` §N](https://github.com/guillaumemichel/veritiles/blob/vX.Y.Z/SPEC.md#n-section-name)): …
 
 ### Changed
 

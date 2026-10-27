@@ -29,6 +29,8 @@ const DEFAULT_TYPES: &[(&str, &str)] = &[
 pub struct Bundle {
     pub anchor: String,
     pub car: Vec<u8>,
+    /// The manifest block alone: the anchor's own bytes.
+    pub manifest: Vec<u8>,
     /// Unique content bytes; inlined only within the budget.
     pub total: u64,
 }
@@ -42,7 +44,7 @@ pub fn assets(args: &AssetsArgs) -> Result<Bundle> {
     let mut car = car::header(&root).to_vec();
     push_section(&mut car, &root, &manifest);
     walk.blocks.iter().for_each(|(cid, bytes)| push_section(&mut car, cid, bytes));
-    Ok(Bundle { anchor: to_text(&root), car, total: walk.total })
+    Ok(Bundle { anchor: to_text(&root), car, manifest, total: walk.total })
 }
 
 impl Bundle {
@@ -53,9 +55,18 @@ impl Bundle {
         over.then(|| format!("assets: {} B exceeds the {INLINE_TOTAL_CAP} B inline budget; {note}", self.total))
     }
 
+    /// Writes the CAR to `path`, then the manifest block beside it.
     pub fn write(&self, path: &str) -> Result<()> {
-        fs::write(path, &self.car).map_err(|e| io_error(&e, "open", path))
+        fs::write(path, &self.car).map_err(|e| io_error(&e, "open", path))?;
+        let block = block_path(path);
+        fs::write(&block, &self.manifest).map_err(|e| io_error(&e, "open", &block))
     }
+}
+
+/// The bare manifest block beside the CAR (`bundle.car` → `bundle.masl`): the
+/// anchor's own bytes, the URL a router lists for the bundle.
+fn block_path(out: &str) -> String {
+    format!("{}.masl", out.strip_suffix(".car").unwrap_or(out))
 }
 
 fn push_section(out: &mut Vec<u8>, cid: &CidBytes, bytes: &[u8]) {

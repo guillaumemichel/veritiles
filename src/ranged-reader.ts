@@ -6,11 +6,13 @@
 // — leaf-aligned reads adopt the speculative body as-is once digests arrive,
 // collapsing a region's first read from two round trips to one. A misaligned
 // or tampered speculative body is discarded and the ordinary verified run
-// fetch takes over; integrity never depends on the speculation.
+// fetch takes over; integrity never depends on the speculation. Once every run
+// that could use it is done, the read reports what it made of the body.
 //
 // This is the content-agnostic read loop: it knows nothing about PMTiles, the
 // proof format, or the DAG — only the LeafIndex seam and the VerifiedStore.
 
+import type { Verdict } from './router.ts';
 import type { VerifiedStore } from './verified-store.ts';
 import { VerificationError } from './verify.ts';
 
@@ -42,6 +44,10 @@ interface Run {
 interface Speculation {
   body: Promise<Uint8Array | null>;
   cancel: () => void;
+  // What a run made of the body: rejected outranks verified.
+  judge: (verdict: 'verified' | 'rejected') => void;
+  // Report the outcome once `runs` have settled.
+  report: (runs: Promise<unknown>[]) => void;
 }
 
 export class RangedReader {
@@ -80,6 +86,7 @@ export class RangedReader {
         leaves = await this.#proofs.leavesFor(offset, end, { signal, onShardsRequested });
       } catch (err) {
         spec?.cancel();
+        spec?.report([]);
         throw err;
       }
     }
@@ -107,24 +114,25 @@ export class RangedReader {
     const adoptable = (r: Run) => spec !== null && r.leaves[0]!.offset >= offset && r.end <= end;
     if (spec !== null && !runs.some(adoptable)) spec.cancel();
 
-    await Promise.all(
-      runs.map(async (r) => {
-        let slices: Uint8Array[] | null = null;
-        if (adoptable(r)) {
-          const body = await spec!.body;
-          if (body !== null) {
-            try {
-              slices = await this.#store.adoptSlices(r.leaves, body, offset, { signal });
-            } catch (err) {
-              if (!(err instanceof VerificationError)) throw err;
-              slices = null; // bad speculation: fall through to a verified fetch
-            }
+    const reads = runs.map(async (r) => {
+      let slices: Uint8Array[] | null = null;
+      if (adoptable(r)) {
+        const body = await spec!.body;
+        if (body !== null) {
+          try {
+            slices = await this.#store.adoptSlices(r.leaves, body, offset, { signal });
+            spec!.judge('verified');
+          } catch (err) {
+            if (!(err instanceof VerificationError)) throw err;
+            spec!.judge('rejected'); // bad speculation: fall through to a verified fetch
           }
         }
-        if (slices === null) slices = await this.#store.fetchRun(this.#path, r.leaves, { signal });
-        r.leaves.forEach((leaf, i) => copyOverlap(slices[i]!, leaf.offset, offset, end, out));
-      }),
-    );
+      }
+      slices ??= await this.#store.fetchRun(this.#path, r.leaves, { signal });
+      r.leaves.forEach((leaf, i) => copyOverlap(slices[i]!, leaf.offset, offset, end, out));
+    });
+    spec?.report(reads);
+    await Promise.all(reads);
     return out;
   }
 
@@ -134,10 +142,18 @@ export class RangedReader {
   #speculate(offset: number, length: number, signal: AbortSignal | undefined): Speculation {
     const controller = new AbortController();
     const merged = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
-    const body = this.#store
+    const speculative = this.#store
       .fetchRangeUnverified(this.#path, offset, length, { signal: merged })
       .catch(() => null);
-    return { body, cancel: () => controller.abort() };
+    let outcome: Verdict = 'unused';
+    return {
+      body: speculative.then((s) => s?.bytes ?? null),
+      cancel: () => controller.abort(),
+      judge: (verdict) => {
+        if (verdict === 'rejected' || outcome === 'unused') outcome = verdict;
+      },
+      report: (runs) => void Promise.allSettled(runs).then(() => speculative).then((s) => s?.settle(outcome)),
+    };
   }
 }
 
