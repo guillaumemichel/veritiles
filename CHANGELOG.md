@@ -30,7 +30,7 @@ fix).
 
 ### Added
 
-- **Routers** ([`SPEC.md` §6](https://github.com/guillaumemichel/veritiles/blob/v0.6.0/SPEC.md#6-routers)): every location now comes from a router. The
+- **Routers** ([`SPEC.md` §6](https://github.com/anymirror-dev/anymirror/blob/v0.6.0/SPEC.md#6-routers)): every location now comes from a router. The
   built-in one follows `source`, `proof` and `hints` as before; a `router`
   option on `VerifiedSource`, `VerifiedFile` and `VerifiedAsset` replaces it
   with your own — a content-routing index, a gateway, a table — so a page can
@@ -272,7 +272,7 @@ anchor.
 
 ### Added
 
-- **Routing hints** ([`SPEC.md` §5](https://github.com/guillaumemichel/veritiles/blob/v0.4.0/SPEC.md#5-routing-hints)): an untrusted `hints.json` maps CIDs to
+- **Routing hints** ([`SPEC.md` §5](https://github.com/anymirror-dev/anymirror/blob/v0.4.0/SPEC.md#5-routing-hints)): an untrusted `hints.json` maps CIDs to
   candidate locations, so a page can ship only its anchor and keep host
   locations in a sibling file that changes on its own cadence. Every byte
   fetched through a hint is still verified against the anchor exactly as a
@@ -399,11 +399,11 @@ anchor.
   with failover across mirrors, tamper bans, and verified-byte caching.
   Examples for MapLibre GL, Leaflet, and OpenLayers.
 
-[0.6.1]: https://github.com/guillaumemichel/veritiles/releases/tag/v0.6.1
-[0.6.0]: https://github.com/guillaumemichel/veritiles/releases/tag/v0.6.0
-[0.5.0]: https://github.com/guillaumemichel/veritiles/releases/tag/v0.5.0
-[0.4.0]: https://github.com/guillaumemichel/veritiles/releases/tag/v0.4.0
-[0.3.1]: https://github.com/guillaumemichel/veritiles/releases/tag/v0.3.1
-[0.3.0]: https://github.com/guillaumemichel/veritiles/releases/tag/v0.3.0
-[0.2.0]: https://github.com/guillaumemichel/veritiles/releases/tag/v0.2.0
-[0.1.0]: https://github.com/guillaumemichel/veritiles/commit/dce0f1318101a128e3fabc5dc86620b6b4041e36
+[0.6.1]: https://github.com/anymirror-dev/anymirror/releases/tag/v0.6.1
+[0.6.0]: https://github.com/anymirror-dev/anymirror/releases/tag/v0.6.0
+[0.5.0]: https://github.com/anymirror-dev/anymirror/releases/tag/v0.5.0
+[0.4.0]: https://github.com/anymirror-dev/anymirror/releases/tag/v0.4.0
+[0.3.1]: https://github.com/anymirror-dev/anymirror/releases/tag/v0.3.1
+[0.3.0]: https://github.com/anymirror-dev/anymirror/releases/tag/v0.3.0
+[0.2.0]: https://github.com/anymirror-dev/anymirror/releases/tag/v0.2.0
+[0.1.0]: https://github.com/anymirror-dev/anymirror/commit/dce0f1318101a128e3fabc5dc86620b6b4041e36

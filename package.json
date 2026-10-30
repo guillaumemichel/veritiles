@@ -7,11 +7,11 @@
   "author": "Guillaume Michel",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/guillaumemichel/veritiles.git"
+    "url": "git+https://github.com/anymirror-dev/anymirror.git"
   },
-  "homepage": "https://github.com/guillaumemichel/veritiles#readme",
+  "homepage": "https://github.com/anymirror-dev/anymirror#readme",
   "bugs": {
-    "url": "https://github.com/guillaumemichel/veritiles/issues"
+    "url": "https://github.com/anymirror-dev/anymirror/issues"
   },
   "keywords": [
     "pmtiles",

@@ -362,8 +362,8 @@ The packer is a repository development tool, not part of the published
 dependencies before running it:
 
 ```sh
-git clone https://github.com/guillaumemichel/veritiles.git
-cd veritiles
+git clone https://github.com/anymirror-dev/anymirror.git
+cd anymirror
 npm ci
 ```
 

@@ -57,7 +57,7 @@ names the expected next tag; check it once the version is settled.
 
 ### Added
 
-- **Feature** ([`SPEC.md` §N](https://github.com/guillaumemichel/veritiles/blob/vX.Y.Z/SPEC.md#n-section-name)): …
+- **Feature** ([`SPEC.md` §N](https://github.com/anymirror-dev/anymirror/blob/vX.Y.Z/SPEC.md#n-section-name)): …
 
 ### Changed
 
@@ -67,7 +67,7 @@ names the expected next tag; check it once the version is settled.
 
 - Breaking changes, if any (none for a normal minor/patch — formats unchanged).
 
-[X.Y.Z]: https://github.com/guillaumemichel/veritiles/releases/tag/vX.Y.Z
+[X.Y.Z]: https://github.com/anymirror-dev/anymirror/releases/tag/vX.Y.Z
 ```
 
 ## 3. CDN pins (README + examples)
@@ -163,7 +163,7 @@ for that tag to then fail red on the duplicate.
     printf '# %s\n\n' "$(printf '%s\n' "$entry" | head -1)"
     cat /tmp/highlights.md
     printf '\n<details>\n<summary>Detailed changes</summary>\n\n%s\n\n</details>\n\n' "$(printf '%s\n' "$entry" | sed -n '/^### /,$p')"
-    gh api -X POST repos/guillaumemichel/veritiles/releases/generate-notes -f tag_name="v$v" -f previous_tag_name="v$prev" --jq .body
+    gh api -X POST repos/anymirror-dev/anymirror/releases/generate-notes -f tag_name="v$v" -f previous_tag_name="v$prev" --jq .body
   } | gh release edit "v$v" --notes-file -
   ```
 
