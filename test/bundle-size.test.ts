@@ -1,6 +1,6 @@
-// Bundle budgets: what a page pays for each use, its entry bundled as an
-// app's bundler would (esbuild, ESM, minified), then gzipped. Each use also
-// names modules it must not carry, code its page never runs.
+// Bundle budgets: what a page pays for each use, its package entry point
+// bundled as an app's bundler would (esbuild, ESM, minified), then gzipped.
+// Each use also names modules it must not carry, code its page never runs.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -11,15 +11,10 @@ import { build } from 'esbuild';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-const RANGED = [
-  'src/descriptor.ts',
-  'src/proof-format.ts',
-  'src/proof-index.ts',
-  'src/ranged-reader.ts',
-  'src/ranged-store.ts',
-  'src/range-source.ts',
-  'src/early-source.ts',
-];
+// A module of anymirror, as the bundle's metafile names it.
+const core = (...names: string[]) => names.map((name) => `packages/anymirror/src/${name}.ts`);
+
+const RANGED = core('descriptor', 'proof-format', 'proof-index', 'ranged-reader', 'ranged-store', 'range-source', 'early-source');
 
 interface Use {
   name: string;
@@ -32,25 +27,25 @@ interface Use {
 const USES: Use[] = [
   {
     name: 'raw file',
-    entry: "export { VerifiedRaw } from './src/raw.ts';",
+    entry: "export { VerifiedRaw } from 'anymirror/raw';",
     budget: 4_450,
-    without: [...RANGED, 'src/hints.ts', 'src/manifest.ts', 'src/car.ts', 'src/drisl.ts', 'src/proof-source.ts'],
+    without: [...RANGED, ...core('hints', 'manifest', 'car', 'drisl', 'proof-source')],
   },
   {
     name: 'MASL bundle',
-    entry: "export { VerifiedBundle } from './src/bundle.ts';",
+    entry: "export { VerifiedBundle } from 'anymirror/bundle';",
     budget: 6_900,
-    without: [...RANGED, 'src/hints.ts'],
+    without: [...RANGED, ...core('hints')],
   },
   {
     name: 'ranged file',
-    entry: "export { VerifiedFile } from './src/verified-file.ts';",
+    entry: "export { VerifiedFile } from 'anymirror/file';",
     budget: 8_600,
-    without: ['src/hints.ts', 'src/manifest.ts', 'src/car.ts', 'src/proof-source.ts'],
+    without: core('hints', 'manifest', 'car', 'proof-source'),
   },
   {
     name: 'map',
-    entry: "export { VerifiedSource, VerifiedAsset, assetProtocol } from './src/index.ts';",
+    entry: "export { VerifiedSource, VerifiedAsset, assetProtocol } from 'veritiles';",
     budget: 12_400,
     without: [],
   },
@@ -83,6 +78,7 @@ async function bundleOnce(entry: string): Promise<Bundle> {
     target: 'es2022',
     write: false,
     metafile: true,
+    conditions: ['anymirror-source'],
   });
   const code = result.outputFiles[0]!.contents;
   const [output] = Object.values(result.metafile.outputs);
@@ -109,7 +105,7 @@ for (const { name, entry, budget, without } of USES) {
 // A router needs the contract alone, so a router's package must cost a
 // page nothing beyond its own code.
 test('router contract: no runtime code', async () => {
-  const { minified, modules } = await bundle("export * from './src/router.ts';");
+  const { minified, modules } = await bundle("export * from '@anymirror/router';");
   assert.deepEqual(modules, []);
   assert.equal(minified, 0);
 });
@@ -118,7 +114,7 @@ test('router contract: no runtime code', async () => {
 // they are made of.
 test('map: carries the modules every use needs', async () => {
   const { modules } = await bundle(USES.at(-1)!.entry);
-  for (const module of ['src/verified-store.ts', 'src/locations.ts', 'src/hints.ts', 'src/manifest.ts', 'src/ranged-reader.ts']) {
+  for (const module of core('verified-store', 'locations', 'hints', 'manifest', 'ranged-reader')) {
     assert.ok(modules.includes(module), `map lacks ${module}`);
   }
 });

@@ -5,9 +5,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { hints } from '../src/hints.ts';
-import { VerifiedFile as HintedFile } from '../src/hinted-file.ts';
-import { VerifiedFile } from '../src/verified-file.ts';
+import { hints } from '../packages/anymirror/src/hints.ts';
+import { VerifiedFile as HintedFile } from '../packages/veritiles/src/hinted-file.ts';
+import { VerifiedFile } from '../packages/anymirror/src/verified-file.ts';
 import { buildPkgFlat } from './helpers/pkg-fixtures.ts';
 import { scene, withPageUrl } from './helpers/serve-hints.ts';
 

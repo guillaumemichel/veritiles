@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { VerifiedAsset } from '../src/asset.ts';
+import { VerifiedAsset } from '../packages/veritiles/src/asset.ts';
 import { buildArtifact, serveArtifact, type ServeEntry } from './helpers/artifact.ts';
 import { deterministicBytes, flipByte } from './helpers/bytes.ts';
 import { buildRaw, buildTree, TREE_ENTRIES } from './helpers/fixtures.ts';

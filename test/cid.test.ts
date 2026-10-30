@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { CID } from 'multiformats/cid';
 import * as Digest from 'multiformats/hashes/digest';
-import { parseAssetAnchor, tryParseCid } from '../src/cid.ts';
+import { parseAssetAnchor, tryParseCid } from '../packages/anymirror/src/cid.ts';
 
 const cid = (codec: number) => CID.createV1(codec, Digest.create(0x12, new Uint8Array(32))).toString();
 test('asset anchors accept raw and dag-cbor only', () => {

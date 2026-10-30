@@ -1,0 +1,73 @@
+{
+  "name": "anymirror",
+  "version": "0.7.0-alpha.0",
+  "description": "Verified content from any mirror: fetches files, byte ranges and bundles from untrusted HTTP hosts and verifies every byte against a CID before handing it over.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Guillaume Michel",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anymirror-dev/anymirror.git",
+    "directory": "packages/anymirror"
+  },
+  "homepage": "https://github.com/anymirror-dev/anymirror/tree/main/packages/anymirror#readme",
+  "bugs": {
+    "url": "https://github.com/anymirror-dev/anymirror/issues"
+  },
+  "keywords": [
+    "cid",
+    "ipfs",
+    "dasl",
+    "verification",
+    "integrity",
+    "content-addressing",
+    "mirror",
+    "cdn",
+    "range-requests",
+    "pmtiles"
+  ],
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "anymirror-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./file": {
+      "anymirror-source": "./src/entries/file.ts",
+      "types": "./dist/entries/file.d.ts",
+      "default": "./dist/entries/file.js"
+    },
+    "./raw": {
+      "anymirror-source": "./src/entries/raw.ts",
+      "types": "./dist/entries/raw.d.ts",
+      "default": "./dist/entries/raw.js"
+    },
+    "./bundle": {
+      "anymirror-source": "./src/entries/bundle.ts",
+      "types": "./dist/entries/bundle.d.ts",
+      "default": "./dist/entries/bundle.js"
+    },
+    "./hints": {
+      "anymirror-source": "./src/entries/hints.ts",
+      "types": "./dist/entries/hints.d.ts",
+      "default": "./dist/entries/hints.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@anymirror/router": "^0.7.0-alpha.0"
+  }
+}

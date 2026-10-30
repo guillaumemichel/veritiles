@@ -9,9 +9,9 @@ import { test } from 'node:test';
 import { CID } from 'multiformats/cid';
 import * as Digest from 'multiformats/hashes/digest';
 
-import { hints } from '../src/hints.ts';
-import { VerifiedFile } from '../src/verified-file.ts';
-import { VerificationError } from '../src/verify.ts';
+import { hints } from '../packages/anymirror/src/hints.ts';
+import { VerifiedFile } from '../packages/anymirror/src/verified-file.ts';
+import { VerificationError } from '../packages/anymirror/src/verify.ts';
 import { flipByte, sha256Bytes } from './helpers/bytes.ts';
 import { buildPkgDeep, buildPkgFlat, buildPkgOne } from './helpers/pkg-fixtures.ts';
 import type { ProofPackage } from './helpers/package.ts';

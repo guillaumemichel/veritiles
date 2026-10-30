@@ -10,12 +10,12 @@ import { test } from 'node:test';
 
 import { PMTiles } from 'pmtiles';
 
-import { VerifiedAsset } from '../src/asset.ts';
-import { hints } from '../src/hints.ts';
-import type { FetchContext, Router } from '../src/router.ts';
-import { send, toRouter } from '../src/routing.ts';
-import { VerifiedSource } from '../src/source.ts';
-import { VerifiedFile } from '../src/verified-file.ts';
+import { VerifiedAsset } from '../packages/veritiles/src/asset.ts';
+import { hints } from '../packages/anymirror/src/hints.ts';
+import type { FetchContext, Router } from '../packages/router/src/index.ts';
+import { send, toRouter } from '../packages/anymirror/src/routing.ts';
+import { VerifiedSource } from '../packages/veritiles/src/source.ts';
+import { VerifiedFile } from '../packages/anymirror/src/verified-file.ts';
 import { packPmtiles } from '../tools/pack.ts';
 import { buildArtifact, serveArtifact } from './helpers/artifact.ts';
 import { deterministicBytes, flipByte } from './helpers/bytes.ts';

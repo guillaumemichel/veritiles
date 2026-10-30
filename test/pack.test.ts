@@ -24,8 +24,8 @@ import {
   parsePmtiles,
   verifyBytes,
 } from '../tools/pack.ts';
-import { decodeDescriptor } from '../src/descriptor.ts';
-import { KIND_DIR, KIND_SHARD, decodeMeta } from '../src/proof-format.ts';
+import { decodeDescriptor } from '../packages/anymirror/src/descriptor.ts';
+import { KIND_DIR, KIND_SHARD, decodeMeta } from '../packages/anymirror/src/proof-format.ts';
 import { blake3Bytes, deterministicBytes, flipByte } from './helpers/bytes.ts';
 import { assemblePmtiles, compress, compressPadded, encodeDirectory, writePmtilesArchive, writeRawPmtilesArchive, zstdWithChecksum, type TileSpec } from './helpers/pmtiles-writer.ts';
 

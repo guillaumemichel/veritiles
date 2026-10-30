@@ -1,8 +1,7 @@
 // veritiles' VerifiedFile: the ranged file with hints on by default (SPEC
 // §5), its documents named by URL, as veritiles has always read files.
 
-import { hints } from './hints.ts';
-import { VerifiedFile as RangedFile, type VerifiedFileOptions as RangedFileOptions } from './verified-file.ts';
+import { hints, VerifiedFile as RangedFile, type VerifiedFileOptions as RangedFileOptions } from 'anymirror';
 
 export interface VerifiedFileOptions extends Omit<RangedFileOptions, 'hints'> {
   /**

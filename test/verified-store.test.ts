@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { Locator } from '../src/locations.ts';
-import { type ByteSource, VerifiedStore } from '../src/verified-store.ts';
-import { equalBytes, VerificationError } from '../src/verify.ts';
+import { Locator } from '../packages/anymirror/src/locations.ts';
+import { type ByteSource, VerifiedStore } from '../packages/anymirror/src/verified-store.ts';
+import { equalBytes, VerificationError } from '../packages/anymirror/src/verify.ts';
 import { deterministicBytes, flipByte, sha256Hex } from './helpers/bytes.ts';
 import { body, memorySource as source, noDefaults, okCheck, routedHosts, storeOf } from './helpers/store.ts';
 

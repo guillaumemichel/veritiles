@@ -1,0 +1,58 @@
+{
+  "name": "veritiles",
+  "version": "0.7.0-alpha.0",
+  "description": "Verified map tiles: a pmtiles-compatible Source that fetches PMTiles byte ranges from any dumb HTTP host and cryptographically verifies every byte against a content-addressed trust anchor (CID) before your map renders it.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Guillaume Michel",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anymirror-dev/anymirror.git",
+    "directory": "packages/veritiles"
+  },
+  "homepage": "https://github.com/anymirror-dev/anymirror/tree/main/packages/veritiles#readme",
+  "bugs": {
+    "url": "https://github.com/anymirror-dev/anymirror/issues"
+  },
+  "keywords": [
+    "pmtiles",
+    "maplibre",
+    "leaflet",
+    "openlayers",
+    "ipfs",
+    "cid",
+    "verification",
+    "integrity",
+    "maps",
+    "tiles",
+    "vector-tiles"
+  ],
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "anymirror-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "unpkg": "./dist/veritiles.js",
+  "jsdelivr": "./dist/veritiles.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && npm run build:iife",
+    "build:iife": "esbuild src/index.ts --bundle --format=iife --global-name=veritiles --minify --target=es2022 --outfile=dist/veritiles.js",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "anymirror": "0.7.0-alpha.0"
+  }
+}

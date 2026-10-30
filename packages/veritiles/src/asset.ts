@@ -4,15 +4,17 @@
 // read assets. A raw file reads at the empty path alone and declares no
 // size.
 
-import { type AssetStat, VerifiedBundle } from './bundle.ts';
-import { DAG_CBOR_CODE, parseAssetAnchor } from './cid.ts';
-import { hints } from './hints.ts';
-import { splitPath } from './manifest.ts';
-import { VerifiedRaw } from './raw.ts';
-import type { RouterOption } from './router.ts';
-import type { FetchFn } from './routing.ts';
-import type { VerifyStats } from './verified-store.ts';
-import { VerificationError } from './verify.ts';
+import {
+  type AssetStat,
+  assetKind,
+  type FetchFn,
+  hints,
+  type RouterOption,
+  VerificationError,
+  VerifiedBundle,
+  VerifiedRaw,
+  type VerifyStats,
+} from 'anymirror';
 
 export interface VerifiedAssetOptions {
   /** Content anchor: raw for one file or dag-cbor for a MASL bundle. */
@@ -35,7 +37,7 @@ export class VerifiedAsset {
 
   constructor(options: VerifiedAssetOptions) {
     const hinted = { ...options, hints: hints(options.hints) };
-    if (parseAssetAnchor(options.cid).codec === DAG_CBOR_CODE) {
+    if (assetKind(options.cid) === 'bundle') {
       this.#asset = new VerifiedBundle(hinted);
       return;
     }
@@ -54,13 +56,13 @@ export class VerifiedAsset {
   async bytes(path = '', { signal }: { signal?: AbortSignal } = {}): Promise<Uint8Array> {
     if (this.#asset instanceof VerifiedBundle) return this.#asset.bytes(path, { signal });
     signal?.throwIfAborted();
-    if (splitPath(path).length) throw new VerificationError('raw artifact has no sub-paths');
+    if (path !== '') throw new VerificationError('raw artifact has no sub-paths');
     return this.#asset.bytes({ signal });
   }
 
   async stat(path = ''): Promise<AssetStat> {
     if (this.#asset instanceof VerifiedBundle) return this.#asset.stat(path);
-    if (splitPath(path).length) throw new VerificationError('raw artifact has no sub-paths');
+    if (path !== '') throw new VerificationError('raw artifact has no sub-paths');
     throw new VerificationError('raw artifact has no declared size');
   }
 }

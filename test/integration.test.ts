@@ -12,7 +12,7 @@ import { test } from 'node:test';
 
 import { PMTiles } from 'pmtiles';
 
-import { VerifiedSource } from '../src/index.ts';
+import { VerifiedSource } from '../packages/veritiles/src/index.ts';
 import { packPmtiles } from '../tools/pack.ts';
 import { deterministicBytes, flipByte } from './helpers/bytes.ts';
 import { servePackage, type FileHostHooks } from './helpers/serve-file.ts';

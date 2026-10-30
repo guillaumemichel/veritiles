@@ -14,8 +14,9 @@
 // the configured anchor CID, so a wrong or malicious host merely fails
 // verification and the next source is tried.
 
+import type { VerifyStats } from 'anymirror';
+
 import { VerifiedFile, type VerifiedFileOptions } from './hinted-file.ts';
-import type { VerifyStats } from './verified-store.ts';
 
 // The pmtiles RangeResponse shape. etag/expires/cacheControl stay unset: the
 // archive is content-addressed and immutable, so etag invalidation can never

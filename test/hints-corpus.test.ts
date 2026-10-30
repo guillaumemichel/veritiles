@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { parseHintsDocument } from '../src/hints.ts';
+import { parseHintsDocument } from '../packages/anymirror/src/hints.ts';
 
 const RAW1 = 'bafkreiabaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibae';
 const CBOR1 = 'bafyreiadambqgaydambqgaydambqgaydambqgaydambqgaydambqgaydam';

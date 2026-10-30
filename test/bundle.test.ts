@@ -5,9 +5,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { NotFoundError, VerifiedBundle } from '../src/bundle.ts';
-import { hints } from '../src/hints.ts';
-import { VerificationError } from '../src/verify.ts';
+import { NotFoundError, VerifiedBundle } from '../packages/anymirror/src/bundle.ts';
+import { hints } from '../packages/anymirror/src/hints.ts';
+import { VerificationError } from '../packages/anymirror/src/verify.ts';
 import { serveArtifact } from './helpers/artifact.ts';
 import { buildRaw, buildTree, TREE_ENTRIES } from './helpers/fixtures.ts';
 import { withPageUrl } from './helpers/serve-hints.ts';

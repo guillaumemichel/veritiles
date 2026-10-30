@@ -8,8 +8,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import type { Router, Verdict } from '../src/router.ts';
-import { VerifiedFile } from '../src/hinted-file.ts';
+import type { Router, Verdict } from '../packages/router/src/index.ts';
+import { VerifiedFile } from '../packages/veritiles/src/hinted-file.ts';
 import { deterministicBytes, flipByte } from './helpers/bytes.ts';
 import { gatedFetch, settle } from './helpers/gated-fetch.ts';
 import { buildProofPackage, nestUnderDir, type ProofPackage } from './helpers/package.ts';

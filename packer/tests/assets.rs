@@ -43,7 +43,7 @@ fn raw_cid(bytes: &[u8]) -> Vec<u8> {
 
 #[test]
 fn reproduces_the_committed_fonts_bundle() {
-    let examples = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/assets");
+    let examples = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../packages/veritiles/examples/assets");
     let dir = Dir::new("assets-fonts");
     let run =
         dir.run_args(["assets".as_ref(), examples.join("fonts").as_os_str(), "--out".as_ref(), "fonts.car".as_ref()]);

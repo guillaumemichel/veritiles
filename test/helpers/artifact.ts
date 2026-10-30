@@ -2,8 +2,8 @@ import { CarWriter } from '@ipld/car';
 import { CID } from 'multiformats/cid';
 import { sha256 } from 'multiformats/hashes/sha2';
 
-import { encodeManifest } from '../../src/manifest.ts';
-import type { FetchFn } from '../../src/routing.ts';
+import { encodeManifest } from '../../packages/anymirror/src/manifest.ts';
+import type { FetchFn } from '../../packages/anymirror/src/routing.ts';
 
 export interface TreeEntry { path: string; bytes: Uint8Array; contentType?: string; }
 export interface Artifact { anchor: string; rootCid: string; files: Map<string, Uint8Array>; proof?: Uint8Array; manifest?: Uint8Array; srcCids?: Map<string, string>; }

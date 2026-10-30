@@ -13,7 +13,8 @@
     "rewriteRelativeImportExtensions": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
+    "customConditions": ["anymirror-source"],
     "noEmit": true
   },
-  "include": ["src", "test", "examples"]
+  "include": ["packages/*/src", "packages/veritiles/examples", "test"]
 }

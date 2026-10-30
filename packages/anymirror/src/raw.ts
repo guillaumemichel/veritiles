@@ -10,7 +10,7 @@ import { DefaultRouter, type Hints } from './default-router.ts';
 import { HttpSource } from './http-source.ts';
 import { ASSET_WHOLE_CAP, DEFAULT_MAX_CACHE_BYTES } from './limits.ts';
 import { Locator } from './locations.ts';
-import type { Router, RouterOption } from './router.ts';
+import type { Router, RouterOption } from '@anymirror/router';
 import { type FetchFn, toRouter } from './routing.ts';
 import { VerifiedStore, type VerifyStats } from './verified-store.ts';
 import { toHex } from './verify.ts';

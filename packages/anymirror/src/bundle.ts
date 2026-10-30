@@ -15,7 +15,7 @@ import { DEFAULT_MAX_CACHE_BYTES, DEFAULT_MAX_FILE_BYTES, DEFAULT_MAX_PROOF_BYTE
 import { Locator } from './locations.ts';
 import { pathKey, splitPath, type ManifestEntry } from './manifest.ts';
 import { ProofSource } from './proof-source.ts';
-import type { Router, RouterOption } from './router.ts';
+import type { Router, RouterOption } from '@anymirror/router';
 import { type FetchFn, toRouter } from './routing.ts';
 import { VerifiedStore, type VerifyStats } from './verified-store.ts';
 import { toHex, verifyDigest, VerificationError } from './verify.ts';

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { VerifiedAsset } from '../src/asset.ts';
-import { NotFoundError } from '../src/bundle.ts';
-import { VerificationError } from '../src/verify.ts';
+import { VerifiedAsset } from '../packages/veritiles/src/asset.ts';
+import { NotFoundError } from '../packages/anymirror/src/bundle.ts';
+import { VerificationError } from '../packages/anymirror/src/verify.ts';
 import { buildArtifact, serveArtifact } from './helpers/artifact.ts';
 import { deterministicBytes, flipByte } from './helpers/bytes.ts';
 import { buildRaw, buildRawEmpty, buildTree, TREE_ENTRIES } from './helpers/fixtures.ts';

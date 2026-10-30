@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { equalBytes, sha256, toHex, VerificationError, verifyDigest } from '../src/verify.ts';
+import { equalBytes, sha256, toHex, VerificationError, verifyDigest } from '../packages/anymirror/src/verify.ts';
 import { deterministicBytes, sha256Hex } from './helpers/bytes.ts';
 
 test('sha256 and toHex agree with node:crypto', async () => {

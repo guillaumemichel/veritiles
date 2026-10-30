@@ -33,7 +33,7 @@ function trickyInputs(): Record<string, Uint8Array> {
 }
 
 function fontsInputs(): Record<string, Uint8Array> {
-  const fonts = fileURLToPath(new URL('../../examples/assets/fonts/', import.meta.url));
+  const fonts = fileURLToPath(new URL('../../packages/veritiles/examples/assets/fonts/', import.meta.url));
   const inputs: Record<string, Uint8Array> = {};
   for (const stack of readdirSync(fonts)) {
     for (const file of readdirSync(join(fonts, stack))) inputs[`fonts/${stack}/${file}`] = readFileSync(join(fonts, stack, file));

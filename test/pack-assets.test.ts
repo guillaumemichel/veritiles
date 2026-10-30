@@ -6,7 +6,7 @@ import { after, test } from 'node:test';
 
 import { CarReader } from '@ipld/car';
 
-import { VerifiedAsset } from '../src/asset.ts';
+import { VerifiedAsset } from '../packages/veritiles/src/asset.ts';
 import { packAssets } from '../tools/pack.ts';
 
 const dirs: string[] = [];

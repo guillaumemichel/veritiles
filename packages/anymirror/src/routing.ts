@@ -2,7 +2,7 @@
 // one request sent through the router that carries it, else through the
 // client's own fetch.
 
-import type { Router, Verdict } from './router.ts';
+import type { Router, Verdict } from '@anymirror/router';
 
 export type FetchFn = typeof fetch;
 

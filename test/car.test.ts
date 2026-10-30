@@ -4,8 +4,8 @@ import { test } from 'node:test';
 import { CID } from 'multiformats/cid';
 import * as Digest from 'multiformats/hashes/digest';
 
-import { parseCarBag } from '../src/car.ts';
-import { DAG_CBOR_SECTION_CAP } from '../src/limits.ts';
+import { parseCarBag } from '../packages/anymirror/src/car.ts';
+import { DAG_CBOR_SECTION_CAP } from '../packages/anymirror/src/limits.ts';
 import { craftCar, rawSection, frameSection, wrapCarV2 } from './helpers/car.ts';
 import { sha256Bytes } from './helpers/bytes.ts';
 

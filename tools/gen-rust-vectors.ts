@@ -15,13 +15,13 @@ import { balanced } from 'ipfs-unixfs-importer/layout';
 import { CID } from 'multiformats/cid';
 import * as Digest from 'multiformats/hashes/digest';
 
-import { decodeDescriptor, encodeDescriptor } from '../src/descriptor.ts';
-import { encodeBytesHead, encodeUint } from '../src/drisl.ts';
-import { encodeManifest, type ManifestEntry } from '../src/manifest.ts';
+import { decodeDescriptor, encodeDescriptor } from '../packages/anymirror/src/descriptor.ts';
+import { encodeBytesHead, encodeUint } from '../packages/anymirror/src/drisl.ts';
+import { encodeManifest, type ManifestEntry } from '../packages/anymirror/src/manifest.ts';
 import { blake3Bytes, deterministicBytes, sha256Bytes } from '../test/helpers/bytes.ts';
 import { box, concat, fragment, header, largeBox, openBox } from '../test/helpers/mp4-writer.ts';
 import { assemblePmtiles, encodeDirectory, writePmtilesArchive } from '../test/helpers/pmtiles-writer.ts';
-import { encodeMeta } from '../src/proof-format.ts';
+import { encodeMeta } from '../packages/anymirror/src/proof-format.ts';
 import {
   buildProofTree,
   choosePmtilesTileGroup,

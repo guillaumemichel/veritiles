@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { encodePath } from '../src/url.ts';
+import { encodePath } from '../packages/anymirror/src/url.ts';
 
 test('encodePath percent-encodes each segment', () => {
   assert.equal(

@@ -10,7 +10,7 @@
 import { abortable } from './abortable.ts';
 import { Faults } from './failover.ts';
 import { MAX_LOCATED_VALUES } from './limits.ts';
-import type { Router } from './router.ts';
+import type { Router } from '@anymirror/router';
 import { resolveLocation } from './url.ts';
 
 // The built-in router as the locator sees it: a CID's configured locations

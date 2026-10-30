@@ -15,8 +15,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { NotFoundError, VerifiedAsset } from '../src/index.ts';
-import { packAssets } from '../tools/pack.ts';
-import { buildArtifact, serveArtifact, type Artifact } from '../test/helpers/artifact.ts';
+import { packAssets } from '../../../tools/pack.ts';
+import { buildArtifact, serveArtifact, type Artifact } from '../../../test/helpers/artifact.ts';
 
 // The published demo map the other examples render; the style's vector
 // source points at it by anchor. NOTE: predates 0.3.0's proof format —

@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { VerifiedSource } from '../src/index.ts';
+import { VerifiedSource } from '../packages/veritiles/src/index.ts';
 import { deterministicBytes } from './helpers/bytes.ts';
 import { buildProofPackage } from './helpers/package.ts';
 import { servePackage } from './helpers/serve-file.ts';

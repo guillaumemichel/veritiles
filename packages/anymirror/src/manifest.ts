@@ -1,4 +1,4 @@
-// Strict veritiles MASL bundle profile: raw content CIDs and authenticated paths.
+// Strict anymirror MASL bundle profile: raw content CIDs and authenticated paths.
 
 import { type Cid, RAW_CODE, SHA2_256_CODE } from './cid.ts';
 import { encodeMapHead, encodeTag42, encodeTextHead, encodeUint, mapHead, tag42Cid, textString, uint } from './drisl.ts';

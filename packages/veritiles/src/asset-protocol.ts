@@ -6,8 +6,9 @@
 // MapLibre uses an answer as it is: a `json` request (a sprite index, a style)
 // gets the parsed value, a `string` request the text, any other the bytes.
 
+import { NotFoundError } from 'anymirror';
+
 import type { VerifiedAsset } from './asset.ts';
-import { NotFoundError } from './bundle.ts';
 
 const SCHEME = 'verified://';
 

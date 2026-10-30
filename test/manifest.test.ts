@@ -4,7 +4,7 @@ import { CID } from 'multiformats/cid';
 import * as Digest from 'multiformats/hashes/digest';
 import * as dagCbor from '@ipld/dag-cbor';
 
-import { decodeManifest, encodeManifest, pathKey, splitPath } from '../src/manifest.ts';
+import { decodeManifest, encodeManifest, pathKey, splitPath } from '../packages/anymirror/src/manifest.ts';
 import { sha256Bytes } from './helpers/bytes.ts';
 
 const src = CID.createV1(0x55, Digest.create(0x12, sha256Bytes(Uint8Array.of(1))));

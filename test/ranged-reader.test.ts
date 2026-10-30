@@ -7,9 +7,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { RangedReader, type Leaf, type LeafIndex } from '../src/ranged-reader.ts';
-import { RangeSource } from '../src/range-source.ts';
-import type { Router, Verdict } from '../src/router.ts';
+import { RangedReader, type Leaf, type LeafIndex } from '../packages/anymirror/src/ranged-reader.ts';
+import { RangeSource } from '../packages/anymirror/src/range-source.ts';
+import type { Router, Verdict } from '../packages/router/src/index.ts';
 import { deterministicBytes, flipByte, sha256Hex } from './helpers/bytes.ts';
 import { rangeFetch, type HostOptions } from './helpers/host.ts';
 import { rangedStoreOf } from './helpers/store.ts';

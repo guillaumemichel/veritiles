@@ -5,8 +5,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { hints } from '../src/hints.ts';
-import { VerifiedRaw } from '../src/raw.ts';
+import { hints } from '../packages/anymirror/src/hints.ts';
+import { VerifiedRaw } from '../packages/anymirror/src/raw.ts';
 import { serveArtifact } from './helpers/artifact.ts';
 import { flipByte } from './helpers/bytes.ts';
 import { buildRaw, buildTree } from './helpers/fixtures.ts';

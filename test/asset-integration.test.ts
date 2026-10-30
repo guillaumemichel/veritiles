@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { assetProtocol } from '../src/asset-protocol.ts';
-import { VerifiedAsset } from '../src/asset.ts';
+import { assetProtocol } from '../packages/veritiles/src/asset-protocol.ts';
+import { VerifiedAsset } from '../packages/veritiles/src/asset.ts';
 import { buildArtifact, serveArtifact } from './helpers/artifact.ts';
 import { buildTree, TREE_ENTRIES } from './helpers/fixtures.ts';
 

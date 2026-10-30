@@ -47,6 +47,11 @@ export function parseBundleAnchor(text: unknown): Cid {
   return parseAnchor(text, [DAG_CBOR_CODE], 'dag-cbor (a MASL manifest)');
 }
 
+/** The reader an asset anchor needs: `VerifiedRaw` for a raw file, `VerifiedBundle` for a MASL bundle. */
+export function assetKind(anchor: string): 'raw' | 'bundle' {
+  return parseAssetAnchor(anchor).codec === DAG_CBOR_CODE ? 'bundle' : 'raw';
+}
+
 function parseAnchor(text: unknown, codecs: number[], expected: string): Cid {
   const cid = parseCid(text, 'anchor');
   if (cid.hashCode !== SHA2_256_CODE || cid.digest.length !== 32) {

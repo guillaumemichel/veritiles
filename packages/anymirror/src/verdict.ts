@@ -1,10 +1,10 @@
-// Verdicts (SPEC §6): what veritiles made of each response from a location,
+// Verdicts (SPEC §6): what the client made of each response from a location,
 // told to a router that carries the requests. Whoever ends a response's life
 // reports it: the transport when the request fails, the verifying fetch when
 // the bytes arrive, a client dropping a response it sent early, or the
 // speculative readers together when they share one body.
 
-import type { Verdict } from './router.ts';
+import type { Verdict } from '@anymirror/router';
 import { VerificationError } from './verify.ts';
 
 // An unverified response body and the hook that reports its fate; only the

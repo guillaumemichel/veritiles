@@ -23,7 +23,7 @@ import { ProofIndex } from './proof-index.ts';
 import { RangeSource } from './range-source.ts';
 import { RangedReader } from './ranged-reader.ts';
 import { type RangedByteSource, RangedStore } from './ranged-store.ts';
-import type { Router, RouterOption } from './router.ts';
+import type { Router, RouterOption } from '@anymirror/router';
 import { type FetchFn, toRouter } from './routing.ts';
 import { type ByteSource, VerifiedStore, type VerifyStats } from './verified-store.ts';
 

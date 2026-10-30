@@ -7,8 +7,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { type DefaultLocations, Locator } from '../src/locations.ts';
-import type { Router } from '../src/router.ts';
+import { type DefaultLocations, Locator } from '../packages/anymirror/src/locations.ts';
+import type { Router } from '../packages/router/src/index.ts';
 
 const CID = 'bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e';
 const turn = () => new Promise((resolve) => setImmediate(resolve));

@@ -13,7 +13,7 @@
 // proof format, or the DAG — only the LeafIndex seam and the RangedStore.
 
 import type { RangedStore } from './ranged-store.ts';
-import type { Verdict } from './router.ts';
+import type { Verdict } from '@anymirror/router';
 import { VerificationError } from './verify.ts';
 
 // A verified byte range of the file and the digest its bytes must hash to.

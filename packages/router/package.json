@@ -1,0 +1,44 @@
+{
+  "name": "@anymirror/router",
+  "version": "0.7.0-alpha.0",
+  "description": "The router contract for anymirror readers: where a CID's bytes may live, and what the reader made of each answer. Types only.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Guillaume Michel",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anymirror-dev/anymirror.git",
+    "directory": "packages/router"
+  },
+  "homepage": "https://github.com/anymirror-dev/anymirror/tree/main/packages/router#readme",
+  "bugs": {
+    "url": "https://github.com/anymirror-dev/anymirror/issues"
+  },
+  "keywords": [
+    "anymirror",
+    "router",
+    "content-routing",
+    "cid",
+    "ipfs"
+  ],
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "anymirror-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepack": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
