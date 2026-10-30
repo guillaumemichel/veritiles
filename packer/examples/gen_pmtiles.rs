@@ -15,10 +15,10 @@
 use std::fs::File;
 use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 
+use anymirror_pack::codec::varint::push_varint;
+use anymirror_pack::plan::pmtiles::decompress::GZIP;
 use flate2::Compression;
 use flate2::write::GzEncoder;
-use veritiles_pack::codec::varint::push_varint;
-use veritiles_pack::plan::pmtiles::decompress::GZIP;
 
 const HEADER_SIZE: u64 = 127;
 const METADATA_OFFSET: u64 = 16 * 1024;

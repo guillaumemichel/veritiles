@@ -4,9 +4,9 @@
 // test/pack-diff.test.ts.
 mod common;
 
+use anymirror_pack::plan::mp4::{is_fragmented_mp4, leaf_spans};
 use common::run::{Dir, fails};
 use common::{Json, fixture, hex, sha256, unhex};
-use veritiles_pack::plan::mp4::{is_fragmented_mp4, leaf_spans};
 
 #[test]
 fn mp4_vectors() {

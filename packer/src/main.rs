@@ -1,11 +1,11 @@
 use std::io::Write;
 use std::process::ExitCode;
 
-use veritiles_pack::args::{self, Command};
-use veritiles_pack::assets::assets;
-use veritiles_pack::error::Result;
-use veritiles_pack::pack::pack;
-use veritiles_pack::verify::verify;
+use anymirror_pack::args::{self, Command};
+use anymirror_pack::assets::assets;
+use anymirror_pack::error::Result;
+use anymirror_pack::pack::pack;
+use anymirror_pack::verify::verify;
 
 fn main() -> ExitCode {
     let argv: Vec<String> = std::env::args_os().skip(1).map(|a| a.to_string_lossy().into_owned()).collect();

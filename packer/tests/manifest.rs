@@ -1,9 +1,9 @@
 // MASL manifest encoding against tools/gen-rust-vectors.ts (encodeManifest).
 mod common;
 
+use anymirror_pack::codec::cid::{RAW, cid_bytes};
+use anymirror_pack::manifest::{Resource, encode};
 use common::{Json, fixture, hex, sha256};
-use veritiles_pack::codec::cid::{RAW, cid_bytes};
-use veritiles_pack::manifest::{Resource, encode};
 
 fn resources(case: &Json) -> Vec<Resource> {
     let count = case.at("count").u64() as usize;

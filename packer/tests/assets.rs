@@ -5,9 +5,9 @@ mod common;
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 
+use anymirror_pack::codec::cid::{DAG_CBOR, RAW, cid_bytes, to_text};
 use common::run::{Dir, fails};
 use common::sha256;
-use veritiles_pack::codec::cid::{DAG_CBOR, RAW, cid_bytes, to_text};
 
 const NOTE_TAIL: &str = "the CAR carries the manifest only and content is fetched from the content URL";
 

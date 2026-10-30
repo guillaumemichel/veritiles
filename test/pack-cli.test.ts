@@ -16,7 +16,7 @@ import { box, concat, fragment } from './helpers/mp4-writer.ts';
 import { writePmtilesArchive } from './helpers/pmtiles-writer.ts';
 
 const packTool = fileURLToPath(new URL('../tools/pack.ts', import.meta.url));
-const dir = await mkdtemp(join(tmpdir(), 'veritiles-pack-cli-'));
+const dir = await mkdtemp(join(tmpdir(), 'anymirror-pack-cli-'));
 after(() => rm(dir, { recursive: true, force: true }));
 const plain = join(dir, 'plain.bin');
 const archive = join(dir, 'map.pmtiles');

@@ -7,9 +7,9 @@ pub mod run;
 
 use std::path::PathBuf;
 
+use anymirror_pack::codec::Digest;
+use anymirror_pack::codec::cid::{CidBytes, to_text};
 use sha2::{Digest as _, Sha256};
-use veritiles_pack::codec::Digest;
-use veritiles_pack::codec::cid::{CidBytes, to_text};
 
 #[derive(Debug, Clone)]
 pub enum Json {

@@ -200,7 +200,7 @@ mod tests {
     }
 
     fn scratch(name: &str) -> String {
-        let dir = std::env::temp_dir().join(format!("veritiles-nodefs-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("anymirror-nodefs-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir.to_string_lossy().into_owned()
@@ -275,8 +275,8 @@ mod tests {
 
     #[test]
     fn mkdirp_reports_a_repeated_enoent() {
-        let error = mkdirp("/proc/veritiles-x").unwrap_err().0;
-        assert_eq!(error, "ENOENT: no such file or directory, mkdir '/proc/veritiles-x'");
+        let error = mkdirp("/proc/anymirror-x").unwrap_err().0;
+        assert_eq!(error, "ENOENT: no such file or directory, mkdir '/proc/anymirror-x'");
     }
 
     #[test]

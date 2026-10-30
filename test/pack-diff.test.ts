@@ -16,7 +16,7 @@ import { packCorpus } from './helpers/pack-corpus.ts';
 import { verifyCorpus } from './helpers/pack-corpus-verify.ts';
 import { runPacker } from './helpers/pack-runner.ts';
 
-const rustBin = fileURLToPath(new URL('../packer/target/release/veritiles-pack', import.meta.url));
+const rustBin = fileURLToPath(new URL('../packer/target/release/anymirror-pack', import.meta.url));
 const tsPack = [process.execPath, fileURLToPath(new URL('../tools/pack.ts', import.meta.url))];
 const missing = `Rust packer not built: ${rustBin} is missing`;
 if (process.env.CI && !existsSync(rustBin)) throw new Error(missing);

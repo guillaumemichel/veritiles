@@ -2,10 +2,10 @@ mod common;
 
 use std::ops::Range;
 
+use anymirror_pack::codec::Digest;
+use anymirror_pack::plan::Leaves;
+use anymirror_pack::proof::tree::{Entry, FileRef, Layout, Limits, plan};
 use common::{Json, fixture, hex, sha256};
-use veritiles_pack::codec::Digest;
-use veritiles_pack::plan::Leaves;
-use veritiles_pack::proof::tree::{Entry, FileRef, Layout, Limits, plan};
 
 fn leaf_digest(offset: u64) -> Digest {
     sha256(&offset.to_le_bytes())
@@ -79,7 +79,7 @@ fn proof_tree_vectors() {
     }
 }
 
-fn one_band(leaves: &Leaves) -> veritiles_pack::error::Result<Layout> {
+fn one_band(leaves: &Leaves) -> anymirror_pack::error::Result<Layout> {
     let band = 0..leaves.count();
     plan(leaves, std::slice::from_ref(&band), Limits::default())
 }

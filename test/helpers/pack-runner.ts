@@ -18,7 +18,7 @@ export interface PackRun {
 }
 
 export async function runPacker(command: string[], packCase: PackCase): Promise<PackRun> {
-  const dir = await mkdtemp(join(tmpdir(), 'veritiles-pack-diff-'));
+  const dir = await mkdtemp(join(tmpdir(), 'anymirror-pack-diff-'));
   try {
     for (const [name, bytes] of Object.entries(packCase.inputs)) {
       await mkdir(dirname(join(dir, name)), { recursive: true });

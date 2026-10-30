@@ -5,17 +5,17 @@ mod common;
 
 use std::io::Write;
 
+use anymirror_pack::codec::varint::push_varint;
+use anymirror_pack::pack::choose_tile_group;
+use anymirror_pack::plan::cuts::{bands, leaf_spans};
+use anymirror_pack::plan::pmtiles::decompress::{GZIP, NONE};
+use anymirror_pack::plan::pmtiles::ranges::Groups;
+use anymirror_pack::plan::pmtiles::{Parsed, parse, parse_with_max_entries};
+use anymirror_pack::proof::tree::Limits;
 use common::run::Dir;
 use common::{fixture, hex, sha256, unhex};
 use flate2::Compression;
 use flate2::write::GzEncoder;
-use veritiles_pack::codec::varint::push_varint;
-use veritiles_pack::pack::choose_tile_group;
-use veritiles_pack::plan::cuts::{bands, leaf_spans};
-use veritiles_pack::plan::pmtiles::decompress::{GZIP, NONE};
-use veritiles_pack::plan::pmtiles::ranges::Groups;
-use veritiles_pack::plan::pmtiles::{Parsed, parse, parse_with_max_entries};
-use veritiles_pack::proof::tree::Limits;
 
 /// Entries `(tile_id, run_length, length, stored_offset)`.
 fn directory(entries: &[(u64, u64, u64, u64)]) -> Vec<u8> {

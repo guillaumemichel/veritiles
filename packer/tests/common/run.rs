@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const BIN: &str = env!("CARGO_BIN_EXE_veritiles-pack");
+const BIN: &str = env!("CARGO_BIN_EXE_anymirror-pack");
 
 pub struct Run {
     pub status: i32,
@@ -17,7 +17,7 @@ pub struct Dir(pub PathBuf);
 
 impl Dir {
     pub fn new(name: &str) -> Dir {
-        let dir = std::env::temp_dir().join(format!("veritiles-pack-cli-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("anymirror-pack-cli-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         Dir(dir)

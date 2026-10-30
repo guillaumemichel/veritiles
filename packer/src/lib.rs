@@ -16,4 +16,4 @@ pub mod unixfs;
 pub mod verify;
 
 // File offsets and lengths are u64 and index the input map as usize.
-const _: () = assert!(usize::BITS == 64, "veritiles-pack needs a 64-bit target");
+const _: () = assert!(usize::BITS == 64, "anymirror-pack needs a 64-bit target");

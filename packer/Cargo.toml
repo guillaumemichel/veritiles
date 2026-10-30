@@ -1,14 +1,14 @@
 [package]
-name = "veritiles-pack"
+name = "anymirror-pack"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.95"
-description = "Packs a file into a veritiles proof tree (byte-identical to tools/pack.ts)"
+description = "Packs a file into an anymirror proof tree (byte-identical to tools/pack.ts)"
 license = "MIT"
 publish = false
 
 [[bin]]
-name = "veritiles-pack"
+name = "anymirror-pack"
 path = "src/main.rs"
 
 [dependencies]

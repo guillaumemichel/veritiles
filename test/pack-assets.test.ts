@@ -13,7 +13,7 @@ const dirs: string[] = [];
 after(() => Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true }))));
 
 async function freshDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'veritiles-pack-assets-'));
+  const dir = await mkdtemp(join(tmpdir(), 'anymirror-pack-assets-'));
   dirs.push(dir);
   return dir;
 }

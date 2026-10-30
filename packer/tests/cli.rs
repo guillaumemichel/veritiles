@@ -54,7 +54,7 @@ fn option_errors() {
     let dir = Dir::new("options");
     dir.write("a.bin", &pattern(100));
     let abs = dir.0.join("a.bin");
-    fails(&dir.run(""), veritiles_pack::args::PACK_USAGE);
+    fails(&dir.run(""), anymirror_pack::args::PACK_USAGE);
     fails(&dir.run("a.bin --out ./a.bin"), "--out resolves to the input file");
     fails(&dir.run(&format!("a.bin --unixfs --full-car {}", abs.display())), "--full-car resolves to the input file");
     fails(&dir.run("a.bin --out x/../a.bin/"), "--out resolves to the input file");
@@ -77,9 +77,9 @@ fn pmtiles_magic_selects_the_pmtiles_profile() {
 #[test]
 fn subcommand_usage() {
     let dir = Dir::new("sub");
-    fails(&dir.run("assets"), veritiles_pack::args::ASSETS_USAGE);
+    fails(&dir.run("assets"), anymirror_pack::args::ASSETS_USAGE);
     fails(&dir.run("assets d --type x"), "bad --type x");
-    fails(&dir.run("verify --cid x"), veritiles_pack::args::VERIFY_USAGE);
+    fails(&dir.run("verify --cid x"), anymirror_pack::args::VERIFY_USAGE);
 }
 
 #[test]

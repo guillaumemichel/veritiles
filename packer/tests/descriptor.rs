@@ -2,8 +2,8 @@
 // the TS-generated vectors decode, or fail with the TS message.
 mod common;
 
+use anymirror_pack::proof::descriptor::decode;
 use common::{fixture, hex, unhex};
-use veritiles_pack::proof::descriptor::decode;
 
 #[test]
 fn decode_vectors() {

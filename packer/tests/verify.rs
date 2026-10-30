@@ -8,17 +8,17 @@ mod common;
 use std::fs;
 use std::path::Path;
 
+use anymirror_pack::args::VerifyArgs;
+use anymirror_pack::codec::cid::{DAG_CBOR, DAG_PB, RAW, cid_bytes, map_cid_bytes, to_text};
+use anymirror_pack::input::Input;
+use anymirror_pack::pipeline::hash_and_write_shards;
+use anymirror_pack::plan::Leaves;
+use anymirror_pack::proof::descriptor;
+use anymirror_pack::proof::format::{KIND_DIR, KIND_SHARD, push_meta_record, push_shard_record};
+use anymirror_pack::proof::tree::{Limits, plan};
+use anymirror_pack::verify::verify;
 use common::run::Dir;
 use common::{blake3, pattern, sha256};
-use veritiles_pack::args::VerifyArgs;
-use veritiles_pack::codec::cid::{DAG_CBOR, DAG_PB, RAW, cid_bytes, map_cid_bytes, to_text};
-use veritiles_pack::input::Input;
-use veritiles_pack::pipeline::hash_and_write_shards;
-use veritiles_pack::plan::Leaves;
-use veritiles_pack::proof::descriptor;
-use veritiles_pack::proof::format::{KIND_DIR, KIND_SHARD, push_meta_record, push_shard_record};
-use veritiles_pack::proof::tree::{Limits, plan};
-use veritiles_pack::verify::verify;
 
 // Packs `bytes` into `dir/p` with tiny tree limits, so a few hundred bytes
 // reach nested meta directories. Returns the anchor.

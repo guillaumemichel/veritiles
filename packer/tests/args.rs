@@ -1,4 +1,4 @@
-use veritiles_pack::args::{
+use anymirror_pack::args::{
     ASSETS_USAGE, AssetsArgs, Command, PACK_USAGE, PackArgs, VERIFY_USAGE, VerifyArgs, parse, parse_size,
 };
 

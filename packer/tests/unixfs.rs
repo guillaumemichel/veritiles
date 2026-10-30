@@ -4,13 +4,13 @@ mod common;
 
 use std::collections::HashSet;
 
+use anymirror_pack::car::CarWriter;
+use anymirror_pack::codec::Digest;
+use anymirror_pack::codec::cid::{self, CidBytes};
+use anymirror_pack::codec::varint::push_varint;
+use anymirror_pack::unixfs::Builder;
 use common::run::Dir;
 use common::{Json, cid_from_text, fixture, hex, sha256, unhex};
-use veritiles_pack::car::CarWriter;
-use veritiles_pack::codec::Digest;
-use veritiles_pack::codec::cid::{self, CidBytes};
-use veritiles_pack::codec::varint::push_varint;
-use veritiles_pack::unixfs::Builder;
 
 // Every block the builder emits, in emission order, plus the root.
 fn build(case: &Json, fanout: usize) -> (Vec<(CidBytes, Vec<u8>)>, CidBytes) {

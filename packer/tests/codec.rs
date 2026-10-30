@@ -1,9 +1,9 @@
 mod common;
 
+use anymirror_pack::codec::{cbor, cid};
+use anymirror_pack::proof::descriptor;
+use anymirror_pack::proof::format::{KIND_SHARD, push_meta_record};
 use common::{cid_from_text, fixture, hex, sha256, unhex};
-use veritiles_pack::codec::{cbor, cid};
-use veritiles_pack::proof::descriptor;
-use veritiles_pack::proof::format::{KIND_SHARD, push_meta_record};
 
 #[test]
 fn cid_vectors() {

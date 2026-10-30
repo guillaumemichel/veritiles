@@ -1,13 +1,13 @@
-# veritiles-pack
+# anymirror-pack
 
-A Rust port of the veritiles packer (`tools/pack.ts`). It produces the same
-bytes as the TS packer — anchor, proof files, CARs, stdout and stderr — but
-memory-maps its input and hashes in parallel, so it packs files of any size
-(a 100+ GB planet PMTiles) with bounded memory. The TS packer reads the whole
-input into memory and stops near 2 GiB.
+A Rust port of the repository's TypeScript packer (`tools/pack.ts`). It
+produces the same bytes as the TS packer — anchor, proof files, CARs, stdout
+and stderr — but memory-maps its input and hashes in parallel, so it packs
+files of any size (a 100+ GB planet PMTiles) with bounded memory. The TS
+packer reads the whole input into memory and stops near 2 GiB.
 
-Like the TS packer, it is a repository development tool, not part of the
-published `veritiles` npm package.
+It is the packer publishers use. Like the TS packer, it is not part of any
+published npm package.
 
 ## Build
 
@@ -16,7 +16,7 @@ bundled zstd.
 
 ```sh
 cd packer
-cargo build --release   # → target/release/veritiles-pack
+cargo build --release   # → target/release/anymirror-pack
 ```
 
 From the repository root, `npm run pack:rs -- …` builds if needed and runs it.
@@ -24,10 +24,10 @@ From the repository root, `npm run pack:rs -- …` builds if needed and runs it.
 ## Usage
 
 ```sh
-veritiles-pack <input> [--profile auto|fixed|pmtiles|mp4] [--chunk N]
+anymirror-pack <input> [--profile auto|fixed|pmtiles|mp4] [--chunk N]
                [--tile-group N] [--unixfs] [--full-car pin.car] [--out dir]
-veritiles-pack assets <dir> [--out bundle.car] [--type ext=mime]
-veritiles-pack verify --cid <anchor> --file <path> --proofs <dir>
+anymirror-pack assets <dir> [--out bundle.car] [--type ext=mime]
+anymirror-pack verify --cid <anchor> --file <path> --proofs <dir>
 ```
 
 **pack** writes `<input>.proofs/` (or `--out`), prints the anchor on stdout,
