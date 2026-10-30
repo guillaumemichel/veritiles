@@ -10,10 +10,10 @@
 // that could use it is done, the read reports what it made of the body.
 //
 // This is the content-agnostic read loop: it knows nothing about PMTiles, the
-// proof format, or the DAG — only the LeafIndex seam and the VerifiedStore.
+// proof format, or the DAG — only the LeafIndex seam and the RangedStore.
 
+import type { RangedStore } from './ranged-store.ts';
 import type { Verdict } from './router.ts';
-import type { VerifiedStore } from './verified-store.ts';
 import { VerificationError } from './verify.ts';
 
 // A verified byte range of the file and the digest its bytes must hash to.
@@ -51,12 +51,12 @@ interface Speculation {
 }
 
 export class RangedReader {
-  #store: VerifiedStore;
+  #store: RangedStore;
   #proofs: LeafIndex;
   #path: string;
   #size: number;
 
-  constructor(store: VerifiedStore, proofs: LeafIndex, path: string, size: number) {
+  constructor(store: RangedStore, proofs: LeafIndex, path: string, size: number) {
     this.#store = store;
     this.#proofs = proofs;
     this.#path = path;

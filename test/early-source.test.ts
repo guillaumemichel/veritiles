@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import { EarlySource } from '../src/early-source.ts';
 import type { Verdict } from '../src/router.ts';
 import type { Body } from '../src/verdict.ts';
-import type { ByteSource } from '../src/verified-store.ts';
+import type { RangedByteSource } from '../src/ranged-store.ts';
 
 interface Call {
   what: string;
@@ -20,7 +20,7 @@ interface Call {
 
 // A source that logs every request and lets the test answer it; each body
 // records the verdicts reported on it.
-function manual(): { source: ByteSource; calls: Call[] } {
+function manual(): { source: RangedByteSource; calls: Call[] } {
   const calls: Call[] = [];
   const call = (what: string, signal?: AbortSignal) =>
     new Promise<Body>((resolve, reject) => {

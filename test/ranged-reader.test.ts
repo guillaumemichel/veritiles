@@ -12,7 +12,7 @@ import { RangeSource } from '../src/range-source.ts';
 import type { Router, Verdict } from '../src/router.ts';
 import { deterministicBytes, flipByte, sha256Hex } from './helpers/bytes.ts';
 import { rangeFetch, type HostOptions } from './helpers/host.ts';
-import { storeOf } from './helpers/store.ts';
+import { rangedStoreOf } from './helpers/store.ts';
 
 // A LeafIndex driven by a cut list: cold until leavesFor runs (like a real
 // multi-level descent), warm after. Never fetches; leaves come from the cuts.
@@ -49,7 +49,7 @@ class FakeIndex implements LeafIndex {
 const PATH = 'map.bin';
 
 function open(data: Uint8Array, cuts: number[], opts: HostOptions = {}, index: LeafIndex = new FakeIndex(data, cuts)) {
-  const store = storeOf([new RangeSource('.', { fetchFn: rangeFetch(new Map([[PATH, data]]), opts) })]);
+  const store = rangedStoreOf([new RangeSource('.', { fetchFn: rangeFetch(new Map([[PATH, data]]), opts) })]);
   return { reader: new RangedReader(store, index, PATH, data.length), store };
 }
 
@@ -194,7 +194,7 @@ function openRouted(data: Uint8Array, cuts: number[], opts: HostOptions = {}) {
     },
   };
   const source = new RangeSource('.', { fetchFn: rangeFetch(new Map([[PATH, data]]), opts), route: { router, cid: 'bafkmap', location: '.' } });
-  const reader = new RangedReader(storeOf([source]), new FakeIndex(data, cuts), PATH, data.length);
+  const reader = new RangedReader(rangedStoreOf([source]), new FakeIndex(data, cuts), PATH, data.length);
   const verdicts = async () => Promise.all(log.map(async ({ range, verdict }) => `${range} ${await verdict}`));
   return { reader, verdicts };
 }

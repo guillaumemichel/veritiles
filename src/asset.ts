@@ -8,6 +8,7 @@
 import { abortable } from './abortable.ts';
 import { type Cid, cidToText, DAG_CBOR_CODE, parseAssetAnchor } from './cid.ts';
 import { DefaultRouter } from './default-router.ts';
+import { HttpSource } from './http-source.ts';
 import {
   ASSET_WHOLE_CAP,
   DEFAULT_MAX_CACHE_BYTES,
@@ -17,7 +18,6 @@ import {
 import { Locator } from './locations.ts';
 import { pathKey, splitPath, type ManifestEntry } from './manifest.ts';
 import { ProofSource } from './proof-source.ts';
-import { RangeSource } from './range-source.ts';
 import type { Router, RouterOption } from './router.ts';
 import { type FetchFn, toRouter } from './routing.ts';
 import { VerifiedStore, type VerifyStats } from './verified-store.ts';
@@ -128,7 +128,7 @@ export class VerifiedAsset {
     return this.#proofs;
   }
 
-  #source(location: string, cid: string): RangeSource {
-    return new RangeSource(location, { fetchFn: this.#fetch, route: { router: this.#router, cid, location } });
+  #source(location: string, cid: string): HttpSource {
+    return new HttpSource(location, { fetchFn: this.#fetch, route: { router: this.#router, cid, location } });
   }
 }

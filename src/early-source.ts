@@ -7,19 +7,19 @@
 // response nothing claims is dropped unused. Every other fetch passes
 // straight through, sent synchronously.
 
+import type { RangedByteSource } from './ranged-store.ts';
 import type { Body } from './verdict.ts';
-import type { ByteSource } from './verified-store.ts';
 
 interface Early {
   response: Promise<Body>;
   controller: AbortController;
 }
 
-export class EarlySource implements ByteSource {
-  #inner: ByteSource;
+export class EarlySource implements RangedByteSource {
+  #inner: RangedByteSource;
   #early = new Map<string, Early>();
 
-  constructor(inner: ByteSource) {
+  constructor(inner: RangedByteSource) {
     this.#inner = inner;
   }
 

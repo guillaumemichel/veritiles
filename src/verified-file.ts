@@ -22,6 +22,7 @@ import { SHARD_FILE_CAP } from './proof-format.ts';
 import { ProofIndex } from './proof-index.ts';
 import { RangeSource } from './range-source.ts';
 import { RangedReader } from './ranged-reader.ts';
+import { type RangedByteSource, RangedStore } from './ranged-store.ts';
 import type { Router, RouterOption } from './router.ts';
 import { type FetchFn, toRouter } from './routing.ts';
 import { type ByteSource, VerifiedStore, type VerifyStats } from './verified-store.ts';
@@ -214,28 +215,28 @@ export class VerifiedFile {
   // the next open asks the router again. The proof files and the map file
   // share the stats object (one {verified, rejected} pair per client) but
   // each store gets its own LRU: proofs are tiny and immutable.
-  async #contentStore(mapText: string): Promise<VerifiedStore> {
+  async #contentStore(mapText: string): Promise<RangedStore> {
     const content = this.#locator.for(mapText, { kind: 'content' });
     if (!content.held().length) await content.pull();
     if (!content.held().length) {
       content.exhausted();
       throw content.unlocated();
     }
-    return new VerifiedStore(
+    return new RangedStore(
       { locations: content, sourceFor: (location) => this.#contentSource(location, mapText) },
       { maxCacheBytes: this.#maxCacheBytes, stats: this.#stats },
     );
   }
 
   // `{proof}/root` locates the descriptor; the proof tree is its directory.
-  #proofSource(location: string): ByteSource {
+  #proofSource(location: string): RangedByteSource {
     const base = location.slice(0, -'/root'.length);
     return new RangeSource(base, { fetchFn: this.#fetch, route: { router: this.#router, cid: this.#anchorText, location } });
   }
 
   // The first configured source holds the early reads' responses: reuse it,
   // so their speculation finds them.
-  #contentSource(location: string, mapText: string): ByteSource {
+  #contentSource(location: string, mapText: string): RangedByteSource {
     if (location === this.#firstContent?.url) return this.#firstContent.source;
     return new RangeSource(location, { fetchFn: this.#fetch, route: { router: this.#router, cid: mapText, location } });
   }

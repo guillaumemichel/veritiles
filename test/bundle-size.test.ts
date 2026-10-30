@@ -16,7 +16,15 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 
 const HINTS = 'hints become a plugin';
 const SPLIT = 'raw files and bundles become two classes';
-const RANGED = ['src/descriptor.ts', 'src/proof-format.ts', 'src/proof-index.ts', 'src/ranged-reader.ts', 'src/early-source.ts'];
+const RANGED = [
+  'src/descriptor.ts',
+  'src/proof-format.ts',
+  'src/proof-index.ts',
+  'src/ranged-reader.ts',
+  'src/ranged-store.ts',
+  'src/range-source.ts',
+  'src/early-source.ts',
+];
 
 interface Use {
   name: string;
@@ -31,7 +39,7 @@ const USES: Use[] = [
   {
     name: 'raw file',
     entry: "export { VerifiedAsset } from './src/asset.ts';",
-    budget: 8_500,
+    budget: 7_800,
     without: RANGED,
     pending: {
       'src/hints.ts': HINTS,
@@ -44,7 +52,7 @@ const USES: Use[] = [
   {
     name: 'MASL bundle',
     entry: "export { VerifiedAsset } from './src/asset.ts';",
-    budget: 8_500,
+    budget: 7_800,
     without: RANGED,
     pending: { 'src/hints.ts': HINTS },
   },
