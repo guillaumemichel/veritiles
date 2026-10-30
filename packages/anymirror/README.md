@@ -118,7 +118,8 @@ const file = new VerifiedFile({ cid: "bafyrei…", hints: hints() }); // reads .
 `hints(url)` names the documents instead. A router finds locations at run
 time, from an index, a gateway or a lookup table:
 [`@anymirror/router`](https://github.com/anymirror-dev/anymirror/tree/main/packages/router)
-describes the contract, and `@anymirror/fisl-router` reads a
+describes the contract, and
+[`@anymirror/fisl-router`](https://github.com/anymirror-dev/anymirror/tree/main/packages/fisl-router) reads a
 [FISL](https://dasl.ing/fisl.html) index. Whatever names a location, every
 byte fetched from it verifies against the anchor, so a wrong location costs a
 request, never a wrong byte.

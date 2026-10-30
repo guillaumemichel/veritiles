@@ -54,8 +54,9 @@ export const router: Router = {
 };
 ```
 
-Pass it to any reader as its `router` option. `@anymirror/fisl-router` is a
-router for an index that speaks [FISL](https://dasl.ing/fisl.html).
+Pass it to any reader as its `router` option.
+[`@anymirror/fisl-router`](https://github.com/anymirror-dev/anymirror/tree/main/packages/fisl-router) is a router for an index that speaks
+[FISL](https://dasl.ing/fisl.html).
 
 ## Versions
 

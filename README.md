@@ -5,12 +5,13 @@ CDN, an S3 bucket, GitHub Pages, a mirror nobody vouches for — and verifies
 every byte against a single trust anchor, a CID, before handing it over.
 Publishing is `cp`; mirroring is `rsync`.
 
-| package                                               | what it is                                                                                       |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| [`anymirror`](packages/anymirror/README.md)           | the readers: a large file by ranges, a small file whole, a bundle by path; hints as a plugin    |
-| [`@anymirror/router`](packages/router/README.md)      | the router contract: where a CID's bytes may live. Types only                                    |
-| [`veritiles`](packages/veritiles/README.md)           | verified maps: a PMTiles `Source`, a MapLibre protocol for styles, sprites and glyphs, a script tag |
-| [`anymirror-pack`](packer/README.md)                  | the packer: makes the proofs a publisher uploads beside the content (Rust, not on npm)           |
+| package                                                    | what it is                                                                                          |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| [`anymirror`](packages/anymirror/README.md)                | the readers: a large file by ranges, a small file whole, a bundle by path; hints as a plugin        |
+| [`@anymirror/router`](packages/router/README.md)           | the router contract: where a CID's bytes may live. Types only                                       |
+| [`@anymirror/fisl-router`](packages/fisl-router/README.md) | a router over a FISL index                                                                          |
+| [`veritiles`](packages/veritiles/README.md)                | verified maps: a PMTiles `Source`, a MapLibre protocol for styles, sprites and glyphs, a script tag |
+| [`anymirror-pack`](packer/README.md)                       | the packer: makes the proofs a publisher uploads beside the content (Rust, not on npm)              |
 
 [`SPEC.md`](SPEC.md) defines the anchors, the proof formats, what a reader
 must check, hints documents and routers.

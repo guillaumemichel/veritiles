@@ -110,6 +110,12 @@ test('router contract: no runtime code', async () => {
   assert.equal(minified, 0);
 });
 
+test('FISL router: its own code alone', async () => {
+  const { modules } = await bundle("export { fisl } from '@anymirror/fisl-router';");
+  assert.ok(modules.length > 0, 'the router has code');
+  for (const module of modules) assert.ok(module.startsWith('packages/fisl-router/src/'), `the FISL router carries ${module}`);
+});
+
 // The checks above only mean something if the bundles hold the modules
 // they are made of.
 test('map: carries the modules every use needs', async () => {

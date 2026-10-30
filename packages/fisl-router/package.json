@@ -1,0 +1,53 @@
+{
+  "name": "@anymirror/fisl-router",
+  "version": "0.7.0-alpha.0",
+  "description": "A router over a FISL index for anymirror readers and veritiles: looks a CID up and yields the URLs it names beside the page's own locations.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Guillaume Michel",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anymirror-dev/anymirror.git",
+    "directory": "packages/fisl-router"
+  },
+  "homepage": "https://github.com/anymirror-dev/anymirror/tree/main/packages/fisl-router#readme",
+  "bugs": {
+    "url": "https://github.com/anymirror-dev/anymirror/issues"
+  },
+  "keywords": [
+    "anymirror",
+    "router",
+    "fisl",
+    "dasl",
+    "content-routing",
+    "cid",
+    "ipfs"
+  ],
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "anymirror-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@anymirror/router": "^0.7.0-alpha.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

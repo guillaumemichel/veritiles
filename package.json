@@ -6,6 +6,7 @@
   "workspaces": [
     "packages/router",
     "packages/anymirror",
+    "packages/fisl-router",
     "packages/veritiles"
   ],
   "engines": {
@@ -18,7 +19,7 @@
     "pack": "node --conditions=anymirror-source tools/pack.ts",
     "pack:rs": "cargo run --release -q --manifest-path packer/Cargo.toml --",
     "typecheck": "tsc -p tsconfig.json",
-    "build": "npm run build -w @anymirror/router && npm run build -w anymirror && npm run build -w veritiles",
+    "build": "npm run build -w @anymirror/router && npm run build -w anymirror && npm run build -w @anymirror/fisl-router && npm run build -w veritiles",
     "version:line": "node tools/version.ts"
   },
   "devDependencies": {

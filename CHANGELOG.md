@@ -19,6 +19,9 @@ fix).
 - **@anymirror/router**: the router contract (`Router`, `FetchContext`,
   `Verdict`, `RouterOption`), types alone. It changes only with the contract,
   so a router depends on nothing else and keeps working across releases.
+- **@anymirror/fisl-router** joins the repository and the version line. It
+  depends on the contract alone, no longer on veritiles, so any anymirror
+  reader takes it as its `router`; its behavior is unchanged.
 
 ### Changed
 

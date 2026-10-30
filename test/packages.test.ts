@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { createContext, runInContext } from 'node:vm';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const WORKSPACES = ['@anymirror/router', 'anymirror', 'veritiles'];
+const WORKSPACES = ['@anymirror/router', 'anymirror', '@anymirror/fisl-router', 'veritiles'];
 
 // The files beyond src/ and dist/ each tarball must carry, and the built
 // files its exports name.
@@ -24,6 +24,7 @@ const FILES: Record<string, string[]> = {
     'README.md', 'LICENSE', 'package.json', 'dist/index.js', 'dist/index.d.ts',
     ...['file', 'raw', 'bundle', 'hints'].flatMap((entry) => [`dist/entries/${entry}.js`, `dist/entries/${entry}.d.ts`]),
   ],
+  '@anymirror/fisl-router': ['README.md', 'LICENSE', 'package.json', 'dist/index.js', 'dist/index.d.ts'],
   veritiles: ['README.md', 'LICENSE', 'package.json', 'dist/index.js', 'dist/index.d.ts', 'dist/veritiles.js'],
 };
 
@@ -35,6 +36,7 @@ const EXPORTS: Record<string, string[]> = {
   'anymirror/bundle': ['NotFoundError', 'VerificationError', 'VerifiedBundle'],
   'anymirror/hints': ['hints'],
   '@anymirror/router': [],
+  '@anymirror/fisl-router': ['fisl', 'interleave', 'readRecords'],
   veritiles: ['NotFoundError', 'RangeBlockedError', 'RangeUnsupportedError', 'VerificationError', 'VerifiedAsset', 'VerifiedFile', 'VerifiedSource', 'assetProtocol'],
 };
 
@@ -46,16 +48,18 @@ import { VerifiedBundle, type AssetStat } from 'anymirror/bundle';
 import { hints, type Hints } from 'anymirror/hints';
 import { assetKind, type VerifyStats } from 'anymirror';
 import type { Router, RouterOption } from '@anymirror/router';
+import { fisl, type FislRecord } from '@anymirror/fisl-router';
 import { VerifiedSource, VerifiedAsset, assetProtocol, type Router as MapRouter } from 'veritiles';
 
 const router: Router = { locate: (cid) => [\`https://mirror.example/\${cid}\`] };
 const option: RouterOption = router;
+const indexed: Router = fisl({ url: 'https://index.example', select: (records: FislRecord[]) => records.flatMap((record) => record.urls) });
 const sameContract: MapRouter = router;
 const plugin: Hints = hints();
 const file: VerifiedFileOptions = { cid: 'bafy', source: 'https://mirror.example/map.pmtiles', hints: plugin, router: option };
 const raw: VerifiedRawOptions = { cid: 'bafk', source: 'https://mirror.example/' };
 new VerifiedFile(file);
-new VerifiedRaw(raw);
+new VerifiedRaw({ ...raw, router: indexed });
 new VerifiedBundle({ cid: 'bafy', source: 'https://mirror.example/' });
 new VerifiedSource({ cid: 'bafy', source: 'https://mirror.example/map.pmtiles', hints: './hints.json' });
 assetProtocol([new VerifiedAsset({ cid: 'bafk' })]);
@@ -122,9 +126,11 @@ test('the types resolve as an app sees them', async () => {
   run(join(root, 'node_modules/.bin/tsc'), ['-p', app], app);
 });
 
-test('the version line: veritiles at anymirror’s version, pinning it', async () => {
+test('the version line: one version, veritiles pinning anymirror, the FISL router on the contract alone', async () => {
   const manifest = async (name: string) => JSON.parse(await readFile(join(app, 'node_modules', name, 'package.json'), 'utf8'));
-  const [anymirror, veritiles] = [await manifest('anymirror'), await manifest('veritiles')];
+  const [anymirror, fislRouter, veritiles] = [await manifest('anymirror'), await manifest('@anymirror/fisl-router'), await manifest('veritiles')];
+  assert.equal(fislRouter.version, anymirror.version);
   assert.equal(veritiles.version, anymirror.version);
   assert.equal(veritiles.dependencies.anymirror, anymirror.version);
+  assert.deepEqual(Object.keys(fislRouter.dependencies), ['@anymirror/router']);
 });

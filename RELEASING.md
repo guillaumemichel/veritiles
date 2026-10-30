@@ -1,7 +1,8 @@
 # Releasing
 
 The repeatable runbook for cutting a release of the packages: `anymirror`,
-`veritiles` and, when its contract changed, `@anymirror/router`. Replace
+`@anymirror/fisl-router`, `veritiles` and, when its contract changed,
+`@anymirror/router`. Replace
 `X.Y.Z` with the target version throughout. Do the steps in order; the gate
 must be green before the version bump, and the release workflow re-runs it
 before it publishes.
@@ -14,20 +15,20 @@ Pre-1.0 SemVer: **minor** (`0.3.x → 0.4.0`) for a new feature, **patch**
 or MASL manifest — or a removed/renamed public option. Widening an option
 (e.g. making a field optional) is not breaking.
 
-`anymirror` and `veritiles` share one version line and are released together:
-veritiles pins anymirror at its own version. `@anymirror/router` has a
+`anymirror`, `@anymirror/fisl-router` and `veritiles` share one version line
+and are released together: veritiles pins anymirror at its own version. `@anymirror/router` has a
 version of its own and moves only when the contract changes, so routers
 written for it keep working across releases; most releases leave it alone.
 
 ## What holds the version
 
-- The version line lives in `packages/anymirror/package.json` and
-  `packages/veritiles/package.json`, plus veritiles' dependency on anymirror;
-  `npm run version:line -- X.Y.Z` sets all three, and `npm install` then
+- The version line lives in the `package.json` of `packages/anymirror`,
+  `packages/fisl-router` and `packages/veritiles`, plus veritiles' dependency
+  on anymirror; `npm run version:line -- X.Y.Z` sets all four, and `npm install` then
   updates `package-lock.json`. The tag must name the line's version.
 - The contract's version is `packages/router/package.json`'s, with the range
-  anymirror depends on in `packages/anymirror/package.json`; both change by
-  hand, and only with the contract.
+  anymirror and the FISL router depend on; all three change by hand, and
+  only with the contract.
 - There is **no** version constant in any `src/` or `tools/` — don't grep for
   one.
 - Every `dist/` is **gitignored** and rebuilt by its package's `prepack`; the
@@ -116,9 +117,9 @@ trust-critical `<script>` include, prefer pin + SRI (`integrity=…`,
 ## 4. Bump, commit, tag
 
 ```
-npm run version:line -- X.Y.Z && npm install   # anymirror, veritiles and its pin
+npm run version:line -- X.Y.Z && npm install   # the line, and veritiles' pin
 # only if the contract changed: packages/router/package.json's version, and
-# anymirror's range for it in packages/anymirror/package.json
+# the range for it in packages/anymirror and packages/fisl-router
 git add -A            # confirm `git status` shows only release files
 git commit -m "chore: release vX.Y.Z"
 git tag -a vX.Y.Z -m "vX.Y.Z"          # tag body = the CHANGELOG entry
@@ -155,8 +156,8 @@ fails, and a local publish carries no provenance. Two exceptions:
 ## 6. Verify
 
 - The Release workflow run for `vX.Y.Z` is green
-- `npm view anymirror version` and `npm view veritiles version` → `X.Y.Z`,
-  and so does `dist-tags.latest` for each
+- `npm view <name> version` → `X.Y.Z` for `anymirror`,
+  `@anymirror/fisl-router` and `veritiles`, and so does `dist-tags.latest`
 - if the contract changed, `npm view @anymirror/router version` → its new
   version
 - `https://unpkg.com/veritiles@X.Y.Z/dist/veritiles.js` resolves (unpkg may lag a
@@ -194,8 +195,8 @@ fails, and a local publish carries no provenance. Two exceptions:
 - [ ] Packer diff green (`cargo build --release --manifest-path packer/Cargo.toml && npm run test:diff`)
 - [ ] `CHANGELOG.md` has the `[X.Y.Z]` entry
 - [ ] CDN pins are the current minor range (only changed on a minor bump)
-- [ ] `npm run version:line -- X.Y.Z && npm install`: anymirror, veritiles
-      and veritiles' pin at `X.Y.Z`; the contract's version only if it changed
+- [ ] `npm run version:line -- X.Y.Z && npm install`: the line and
+      veritiles' pin at `X.Y.Z`; the contract's version only if it changed
 - [ ] Working docs (`PLAN-*`, `SPEC-*`, `RELEASE-v*`) not committed
 - [ ] `chore: release vX.Y.Z` commit + `vX.Y.Z` tag
 - [ ] `git push origin main --follow-tags`

@@ -1,7 +1,7 @@
 # Publish to npm on a version tag (v1.2.3): every package whose version npm
-# does not have yet. anymirror and veritiles share the version line, which the
-# tag names; @anymirror/router moves only when the contract changes, so most
-# releases leave it as it is. Publishing to npm is all a CDN needs: unpkg and
+# does not have yet. anymirror, @anymirror/fisl-router and veritiles share the
+# version line, which the tag names; @anymirror/router moves only when the
+# contract changes, so most releases leave it as it is. Publishing to npm is all a CDN needs: unpkg and
 # jsDelivr mirror the registry automatically.
 #
 # Auth is npm TRUSTED PUBLISHING (OIDC): no tokens, and provenance
@@ -43,7 +43,7 @@ jobs:
       # goes out under `next`, never `latest`.
       - name: Publish the versions npm lacks
         run: |
-          for dir in router anymirror veritiles; do
+          for dir in router anymirror fisl-router veritiles; do
             name=$(node -p "require('./packages/$dir/package.json').name")
             version=$(node -p "require('./packages/$dir/package.json').version")
             if [ -n "$(npm view "$name@$version" version 2>/dev/null)" ]; then
