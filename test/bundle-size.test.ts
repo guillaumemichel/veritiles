@@ -118,6 +118,14 @@ for (const { name, entry, budget, without, pending } of USES) {
   }
 }
 
+// A router needs the contract alone, so a router's package must cost a
+// page nothing beyond its own code.
+test('router contract: no runtime code', async () => {
+  const { minified, modules } = await bundle("export * from './src/router.ts';");
+  assert.deepEqual(modules, []);
+  assert.equal(minified, 0);
+});
+
 // The checks above only mean something if the bundles hold the modules
 // they are made of.
 test('map: carries the modules every use needs', async () => {

@@ -17,8 +17,9 @@ import {
 import { Locator } from './locations.ts';
 import { pathKey, splitPath, type ManifestEntry } from './manifest.ts';
 import { ProofSource } from './proof-source.ts';
-import { type FetchFn, RangeSource } from './range-source.ts';
-import { type Router, type RouterOption, toRouter } from './router.ts';
+import { RangeSource } from './range-source.ts';
+import type { Router, RouterOption } from './router.ts';
+import { type FetchFn, toRouter } from './routing.ts';
 import { VerifiedStore, type VerifyStats } from './verified-store.ts';
 import { toHex, verifyDigest, VerificationError } from './verify.ts';
 

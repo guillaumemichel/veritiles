@@ -11,7 +11,8 @@ import { test } from 'node:test';
 import { PMTiles } from 'pmtiles';
 
 import { VerifiedAsset } from '../src/asset.ts';
-import { send, toRouter, type FetchContext, type Router } from '../src/router.ts';
+import type { FetchContext, Router } from '../src/router.ts';
+import { send, toRouter } from '../src/routing.ts';
 import { VerifiedSource } from '../src/source.ts';
 import { VerifiedFile } from '../src/verified-file.ts';
 import { packPmtiles } from '../tools/pack.ts';

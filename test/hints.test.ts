@@ -11,7 +11,7 @@ import * as Digest from 'multiformats/hashes/digest';
 import { cidToText, parseCid } from '../src/cid.ts';
 import { HintResolver, parseHintsDocument } from '../src/hints.ts';
 import { MAX_HINT_BYTES } from '../src/limits.ts';
-import type { FetchFn } from '../src/range-source.ts';
+import type { FetchFn } from '../src/routing.ts';
 import { withPageUrl } from './helpers/serve-hints.ts';
 
 const SHA2_256 = 0x12;

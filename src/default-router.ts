@@ -8,9 +8,10 @@
 // CID's beside the anchor's. A custom router gets this stream as its
 // `defaults`; where its own locations lead is its business.
 
-import { containingDir, HintResolver } from './hints.ts';
+import { HintResolver } from './hints.ts';
 import type { DefaultLocations } from './locations.ts';
-import { encodePath, type FetchFn } from './range-source.ts';
+import type { FetchFn } from './routing.ts';
+import { containingDir, encodePath } from './url.ts';
 
 export interface DefaultRouterOptions {
   /** The client's anchor, canonical text. */

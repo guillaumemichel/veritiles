@@ -6,12 +6,12 @@
 // non-object body or the size cap rejects a whole document.
 
 import { cidToText, tryParseCid } from './cid.ts';
-import { MAX_HINT_BYTES, MAX_HINT_DOCS, MAX_HINT_URL_BYTES, MAX_HINT_URLS_PER_CID } from './limits.ts';
-import type { FetchFn } from './range-source.ts';
+import { MAX_HINT_BYTES, MAX_HINT_DOCS, MAX_HINT_URLS_PER_CID } from './limits.ts';
 import { readBody } from './read-body.ts';
+import type { FetchFn } from './routing.ts';
+import { resolveLocation } from './url.ts';
 
 const DEFAULT_HINTS_URL = './hints.json';
-const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 // Parse one hints document against its own URL. Returns a CID-text → URL-list
@@ -41,33 +41,8 @@ export function parseHintsDocument(text: string, docUrl: string): Map<string, st
   return out;
 }
 
-// Resolve one untrusted location — a hints entry against its document's URL,
-// a router's answer absolute — keeping it only if it is a string, resolves to
-// an http(s) URL, and stays within the byte cap; strip a trailing slash so a
-// directory hint composes like a configured base.
-export function resolveLocation(raw: unknown, base?: string): string | null {
-  if (typeof raw !== 'string') return null;
-  let url: URL;
-  try {
-    url = new URL(raw, base);
-  } catch {
-    return null;
-  }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-  if (encoder.encode(url.href).length > MAX_HINT_URL_BYTES) return null;
-  return url.href.replace(/\/+$/, '');
-}
-
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-// The directory containing a file location — the probe anchor for locations
-// that are files (a content file, a proof CAR). `new URL('.', u)` drops the
-// last path segment and any query string, so the result is always a clean
-// directory URL.
-export function containingDir(url: string): string {
-  return new URL('.', url).href;
 }
 
 export interface HintResolverOptions {

@@ -9,9 +9,9 @@
 
 import { abortable } from './abortable.ts';
 import { Faults } from './failover.ts';
-import { resolveLocation } from './hints.ts';
 import { MAX_LOCATED_VALUES } from './limits.ts';
 import type { Router } from './router.ts';
+import { resolveLocation } from './url.ts';
 
 // The built-in router as the locator sees it: a CID's configured locations
 // at once, the rest (hinted, probed) as they come, and the hints documents

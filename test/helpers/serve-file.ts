@@ -3,7 +3,7 @@
 // (`{fileUrl}.proofs/{root,…}`). Records every request; hooks can tamper
 // ranged bodies, tamper proof files by path, or force proof statuses.
 
-import type { FetchFn } from '../../src/range-source.ts';
+import type { FetchFn } from '../../src/routing.ts';
 
 export interface FileHostHooks {
   /** Mutate a ranged body; return undefined to leave it unchanged. */

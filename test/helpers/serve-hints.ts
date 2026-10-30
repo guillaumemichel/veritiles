@@ -4,7 +4,7 @@
 // top-level request URL in order — request accounting is first-class in the
 // hints suites, so "no request happened" is an assertion.
 
-import type { FetchFn } from '../../src/range-source.ts';
+import type { FetchFn } from '../../src/routing.ts';
 import { servePackage, type FileHostHooks } from './serve-file.ts';
 
 // Run fn with globalThis.location set to href — the environment base the hint

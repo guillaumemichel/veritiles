@@ -20,9 +20,10 @@ import { DEFAULT_MAX_CACHE_BYTES, PROOF_CACHE_BYTES } from './limits.ts';
 import { Locator } from './locations.ts';
 import { SHARD_FILE_CAP } from './proof-format.ts';
 import { ProofIndex } from './proof-index.ts';
-import { type FetchFn, RangeSource } from './range-source.ts';
+import { RangeSource } from './range-source.ts';
 import { RangedReader } from './ranged-reader.ts';
-import { type Router, type RouterOption, toRouter } from './router.ts';
+import type { Router, RouterOption } from './router.ts';
+import { type FetchFn, toRouter } from './routing.ts';
 import { type ByteSource, VerifiedStore, type VerifyStats } from './verified-store.ts';
 
 export interface VerifiedFileOptions {

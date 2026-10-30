@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  encodePath,
   RangeBlockedError,
   RangeSource,
   RangeUnsupportedError,
 } from '../src/range-source.ts';
 import type { FetchContext, Router, Verdict } from '../src/router.ts';
+import { encodePath } from '../src/url.ts';
 import { VerificationError } from '../src/verify.ts';
 import { deterministicBytes } from './helpers/bytes.ts';
 import { rangeFetch } from './helpers/host.ts';

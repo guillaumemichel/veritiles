@@ -8,10 +8,9 @@
 // that fails reports its own verdict.
 
 import { readBody } from './read-body.ts';
-import { type Route, send } from './router.ts';
+import { type FetchFn, type Route, send } from './routing.ts';
+import { encodePath } from './url.ts';
 import { type Body, verdictOf } from './verdict.ts';
-
-export type FetchFn = typeof fetch;
 
 // A ranged GET the host answered with 200 (whole file) instead of 206: it
 // ignores Range, so a per-tile read would drag the entire archive.
@@ -103,9 +102,4 @@ export class RangeSource {
     }
     return res;
   }
-}
-
-// Percent-encode each path segment; the separators stay literal.
-export function encodePath(path: string): string {
-  return path.split('/').map(encodeURIComponent).join('/');
 }
