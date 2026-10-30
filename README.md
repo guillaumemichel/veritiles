@@ -7,7 +7,7 @@ Publishing is `cp`; mirroring is `rsync`.
 
 | package                                                    | what it is                                                                                          |
 | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| [`anymirror`](packages/anymirror/README.md)                | the readers: a large file by ranges, a small file whole, a bundle by path; hints as a plugin        |
+| [`@anymirror/core`](packages/core/README.md)               | the readers: a large file by ranges, a small file whole, a bundle by path; hints as a plugin        |
 | [`@anymirror/router`](packages/router/README.md)           | the router contract: where a CID's bytes may live. Types only                                       |
 | [`@anymirror/fisl-router`](packages/fisl-router/README.md) | a router over a FISL index                                                                          |
 | [`veritiles`](packages/veritiles/README.md)                | verified maps: a PMTiles `Source`, a MapLibre protocol for styles, sprites and glyphs, a script tag |

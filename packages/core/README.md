@@ -1,6 +1,6 @@
-# anymirror
+# @anymirror/core
 
-Verified content from any mirror. anymirror's readers fetch files from
+Verified content from any mirror. The anymirror readers fetch files from
 **untrusted HTTP hosts** — a CDN, an S3 bucket, GitHub Pages, `npx serve` —
 and **verify every byte** against a single trust anchor (a
 [CID](https://dasl.ing/cid.html)) before handing it over. A host can withhold
@@ -10,14 +10,14 @@ verification, is counted, and the next host is tried.
 One reader per shape of content, each behind its own entry point, so a page
 carries only the code it runs:
 
-| entry point        | reader           | reads                                                         | gzipped |
-| ------------------ | ---------------- | ------------------------------------------------------------- | ------- |
-| `anymirror/file`   | `VerifiedFile`   | one large file, such as PMTiles or a video, by byte ranges    | 8.5 KB  |
-| `anymirror/raw`    | `VerifiedRaw`    | one small file, at most 256 KiB, whole                        | 4.4 KB  |
-| `anymirror/bundle` | `VerifiedBundle` | files by path from a MASL bundle: glyphs, sprites, a site     | 6.8 KB  |
-| `anymirror/hints`  | `hints`          | the hints plugin: where a CID lives, from documents (below)   | +1.2 KB |
+| entry point              | reader           | reads                                                       | gzipped |
+| ------------------------ | ---------------- | ----------------------------------------------------------- | ------- |
+| `@anymirror/core/file`   | `VerifiedFile`   | one large file, such as PMTiles or a video, by byte ranges  | 8.5 KB  |
+| `@anymirror/core/raw`    | `VerifiedRaw`    | one small file, at most 256 KiB, whole                      | 4.4 KB  |
+| `@anymirror/core/bundle` | `VerifiedBundle` | files by path from a MASL bundle: glyphs, sprites, a site   | 6.8 KB  |
+| `@anymirror/core/hints`  | `hints`          | the hints plugin: where a CID lives, from documents (below) | +1.2 KB |
 
-`anymirror` itself exports them all. It has no dependencies beyond its
+`@anymirror/core` itself exports them all. It has no dependencies beyond its
 [router contract](https://github.com/anymirror-dev/anymirror/tree/main/packages/router),
 which holds no code; WebCrypto is the only cryptography. For maps, use
 [veritiles](https://github.com/anymirror-dev/anymirror/tree/main/packages/veritiles),
@@ -26,7 +26,7 @@ built on these readers.
 ## Install
 
 ```sh
-npm install anymirror
+npm install @anymirror/core
 ```
 
 ## Reading
@@ -34,7 +34,7 @@ npm install anymirror
 ### A large file, by ranges
 
 ```js
-import { VerifiedFile } from "anymirror/file";
+import { VerifiedFile } from "@anymirror/core/file";
 
 const file = new VerifiedFile({
   cid: "bafyrei…", // the proof descriptor's CID: the only trust anchor
@@ -54,7 +54,7 @@ piece as reads need them. A warm read is one exact `Range` request.
 ### One small file
 
 ```js
-import { VerifiedRaw } from "anymirror/raw";
+import { VerifiedRaw } from "@anymirror/core/raw";
 
 const style = new VerifiedRaw({
   cid: "bafkrei…", // the raw CID of the file: the sha2-256 of its bytes
@@ -69,7 +69,7 @@ prints it for a file of at most 256 KiB.
 ### A bundle of files
 
 ```js
-import { NotFoundError, VerifiedBundle } from "anymirror/bundle";
+import { NotFoundError, VerifiedBundle } from "@anymirror/core/bundle";
 
 const fonts = new VerifiedBundle({
   cid: "bafyrei…", // the bundle's manifest
@@ -86,20 +86,20 @@ the bundle provably lacks that path, unlike a host's HTTP 404. A small bundle
 travels whole in its CAR, so one fetch serves every file.
 
 An anchor's codec says which reader it needs: `assetKind(cid)`, from
-`anymirror`, answers `'raw'` or `'bundle'`.
+`@anymirror/core`, answers `'raw'` or `'bundle'`.
 
 ## Locations
 
 The anchor is the only trust input; locations carry none. Every reader takes:
 
-| option          | type                 | description                                                                                                                                               |
-| --------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cid`           | `string`             | The anchor (CIDv1, base32, sha2-256).                                                                                                                     |
-| `source`        | `string \| string[]` | URL(s) of the content, tried in order. Optional if hints or a router supply them.                                                                        |
-| `hints`         | `Hints`              | Hints documents and discovery, untrusted: `hints()` from `anymirror/hints`. Off unless passed.                                                            |
+| option          | type                 | description                                                                                                                                                |
+| --------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cid`           | `string`             | The anchor (CIDv1, base32, sha2-256).                                                                                                                      |
+| `source`        | `string \| string[]` | URL(s) of the content, tried in order. Optional if hints or a router supply them.                                                                          |
+| `hints`         | `Hints`              | Hints documents and discovery, untrusted: `hints()` from `@anymirror/core/hints`. Off unless passed.                                                       |
 | `router`        | `Router \| locate`   | A router, untrusted: yields where a CID's bytes may live, in place of the built-in router, whose locations it gets as `defaults`. May carry every request. |
-| `fetchFn`       | `typeof fetch`       | Replaces the global `fetch`: instrumentation, credentials, tests.                                                                                         |
-| `maxCacheBytes` | `number`             | Budget for the verified-byte cache (default 64 MiB).                                                                                                      |
+| `fetchFn`       | `typeof fetch`       | Replaces the global `fetch`: instrumentation, credentials, tests.                                                                                          |
+| `maxCacheBytes` | `number`             | Budget for the verified-byte cache (default 64 MiB).                                                                                                       |
 
 `VerifiedFile` and `VerifiedBundle` also take `proof`, the URL(s) of their
 proof; `VerifiedBundle` takes `maxProofBytes` and `maxFileBytes`, bounds on a
@@ -109,8 +109,8 @@ With the hints plugin, a page can ship anchors alone and keep their locations
 in a JSON file beside it, which changes when hosts move:
 
 ```js
-import { VerifiedFile } from "anymirror/file";
-import { hints } from "anymirror/hints";
+import { VerifiedFile } from "@anymirror/core/file";
+import { hints } from "@anymirror/core/hints";
 
 const file = new VerifiedFile({ cid: "bafyrei…", hints: hints() }); // reads ./hints.json
 ```

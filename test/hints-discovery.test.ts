@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { VerifiedFile } from '../packages/veritiles/src/hinted-file.ts';
-import { MAX_HINT_DOCS } from '../packages/anymirror/src/limits.ts';
+import { MAX_HINT_DOCS } from '../packages/core/src/limits.ts';
 import { buildPkgFlat } from './helpers/pkg-fixtures.ts';
 import { scene, withPageUrl } from './helpers/serve-hints.ts';
 

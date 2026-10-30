@@ -6,10 +6,10 @@
 import { CID } from 'multiformats/cid';
 import * as Digest from 'multiformats/hashes/digest';
 
-import { decodeDescriptor, encodeDescriptor } from '../../packages/anymirror/src/descriptor.ts';
-import { KIND_DIR, KIND_SHARD, SHARD_FILE_CAP, SHARD_RECORD_SIZE, shardName } from '../../packages/anymirror/src/proof-format.ts';
+import { decodeDescriptor, encodeDescriptor } from '../../packages/core/src/descriptor.ts';
+import { KIND_DIR, KIND_SHARD, SHARD_FILE_CAP, SHARD_RECORD_SIZE, shardName } from '../../packages/core/src/proof-format.ts';
 import { blake3Bytes, sha256Bytes } from './bytes.ts';
-import { encodeMeta, encodeShard } from '../../packages/anymirror/src/proof-format.ts';
+import { encodeMeta, encodeShard } from '../../packages/core/src/proof-format.ts';
 
 const SHA2_256 = 0x12;
 const BLAKE3 = 0x1e;

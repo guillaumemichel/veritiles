@@ -14,13 +14,13 @@ import { fileURLToPath } from 'node:url';
 import { createContext, runInContext } from 'node:vm';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const WORKSPACES = ['@anymirror/router', 'anymirror', '@anymirror/fisl-router', 'veritiles'];
+const WORKSPACES = ['@anymirror/router', '@anymirror/core', '@anymirror/fisl-router', 'veritiles'];
 
 // The files beyond src/ and dist/ each tarball must carry, and the built
 // files its exports name.
 const FILES: Record<string, string[]> = {
   '@anymirror/router': ['README.md', 'LICENSE', 'package.json', 'dist/index.js', 'dist/index.d.ts'],
-  anymirror: [
+  '@anymirror/core': [
     'README.md', 'LICENSE', 'package.json', 'dist/index.js', 'dist/index.d.ts',
     ...['file', 'raw', 'bundle', 'hints'].flatMap((entry) => [`dist/entries/${entry}.js`, `dist/entries/${entry}.d.ts`]),
   ],
@@ -30,11 +30,11 @@ const FILES: Record<string, string[]> = {
 
 // Every entry point, with the values it exports at run time.
 const EXPORTS: Record<string, string[]> = {
-  anymirror: ['NotFoundError', 'RangeBlockedError', 'RangeUnsupportedError', 'VerificationError', 'VerifiedBundle', 'VerifiedFile', 'VerifiedRaw', 'assetKind', 'hints'],
-  'anymirror/file': ['RangeBlockedError', 'RangeUnsupportedError', 'VerificationError', 'VerifiedFile'],
-  'anymirror/raw': ['VerificationError', 'VerifiedRaw'],
-  'anymirror/bundle': ['NotFoundError', 'VerificationError', 'VerifiedBundle'],
-  'anymirror/hints': ['hints'],
+  '@anymirror/core': ['NotFoundError', 'RangeBlockedError', 'RangeUnsupportedError', 'VerificationError', 'VerifiedBundle', 'VerifiedFile', 'VerifiedRaw', 'assetKind', 'hints'],
+  '@anymirror/core/file': ['RangeBlockedError', 'RangeUnsupportedError', 'VerificationError', 'VerifiedFile'],
+  '@anymirror/core/raw': ['VerificationError', 'VerifiedRaw'],
+  '@anymirror/core/bundle': ['NotFoundError', 'VerificationError', 'VerifiedBundle'],
+  '@anymirror/core/hints': ['hints'],
   '@anymirror/router': [],
   '@anymirror/fisl-router': ['fisl', 'interleave', 'readRecords'],
   veritiles: ['NotFoundError', 'RangeBlockedError', 'RangeUnsupportedError', 'VerificationError', 'VerifiedAsset', 'VerifiedFile', 'VerifiedSource', 'assetProtocol'],
@@ -42,11 +42,11 @@ const EXPORTS: Record<string, string[]> = {
 
 // An app that names a type from every entry point.
 const APP_TYPES = `
-import { VerifiedFile, type VerifiedFileOptions } from 'anymirror/file';
-import { VerifiedRaw, type VerifiedRawOptions } from 'anymirror/raw';
-import { VerifiedBundle, type AssetStat } from 'anymirror/bundle';
-import { hints, type Hints } from 'anymirror/hints';
-import { assetKind, type VerifyStats } from 'anymirror';
+import { VerifiedFile, type VerifiedFileOptions } from '@anymirror/core/file';
+import { VerifiedRaw, type VerifiedRawOptions } from '@anymirror/core/raw';
+import { VerifiedBundle, type AssetStat } from '@anymirror/core/bundle';
+import { hints, type Hints } from '@anymirror/core/hints';
+import { assetKind, type VerifyStats } from '@anymirror/core';
 import type { Router, RouterOption } from '@anymirror/router';
 import { fisl, type FislRecord } from '@anymirror/fisl-router';
 import { VerifiedSource, VerifiedAsset, assetProtocol, type Router as MapRouter } from 'veritiles';
@@ -104,12 +104,12 @@ test('each entry point exports its API', () => {
   const script = `
     const names = {};
     for (const spec of ${JSON.stringify(Object.keys(EXPORTS))}) names[spec] = Object.keys(await import(spec)).sort();
-    const [core, map] = [await import('anymirror'), await import('veritiles')];
+    const [core, map] = [await import('@anymirror/core'), await import('veritiles')];
     console.log(JSON.stringify({ names, shared: core.VerificationError === map.VerificationError }));
   `;
   const { names, shared } = JSON.parse(run('node', ['--input-type=module', '-e', script], app));
   assert.deepEqual(names, Object.fromEntries(Object.entries(EXPORTS).map(([spec, list]) => [spec, [...list].sort()])));
-  assert.ok(shared, 'veritiles re-exports anymirror’s classes, not copies');
+  assert.ok(shared, 'veritiles re-exports @anymirror/core’s classes, not copies');
 });
 
 test('the script-tag bundle defines veritiles with the same API', async () => {
@@ -126,11 +126,11 @@ test('the types resolve as an app sees them', async () => {
   run(join(root, 'node_modules/.bin/tsc'), ['-p', app], app);
 });
 
-test('the version line: one version, veritiles pinning anymirror, the FISL router on the contract alone', async () => {
+test('the version line: one version, veritiles pinning the core, the FISL router on the contract alone', async () => {
   const manifest = async (name: string) => JSON.parse(await readFile(join(app, 'node_modules', name, 'package.json'), 'utf8'));
-  const [anymirror, fislRouter, veritiles] = [await manifest('anymirror'), await manifest('@anymirror/fisl-router'), await manifest('veritiles')];
-  assert.equal(fislRouter.version, anymirror.version);
-  assert.equal(veritiles.version, anymirror.version);
-  assert.equal(veritiles.dependencies.anymirror, anymirror.version);
+  const [core, fislRouter, veritiles] = [await manifest('@anymirror/core'), await manifest('@anymirror/fisl-router'), await manifest('veritiles')];
+  assert.equal(fislRouter.version, core.version);
+  assert.equal(veritiles.version, core.version);
+  assert.equal(veritiles.dependencies['@anymirror/core'], core.version);
   assert.deepEqual(Object.keys(fislRouter.dependencies), ['@anymirror/router']);
 });

@@ -1,5 +1,5 @@
 {
-  "name": "anymirror",
+  "name": "@anymirror/core",
   "version": "0.7.0-alpha.0",
   "description": "Verified content from any mirror: fetches files, byte ranges and bundles from untrusted HTTP hosts and verifies every byte against a CID before handing it over.",
   "type": "module",
@@ -8,9 +8,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/anymirror-dev/anymirror.git",
-    "directory": "packages/anymirror"
+    "directory": "packages/core"
   },
-  "homepage": "https://github.com/anymirror-dev/anymirror/tree/main/packages/anymirror#readme",
+  "homepage": "https://github.com/anymirror-dev/anymirror/tree/main/packages/core#readme",
   "bugs": {
     "url": "https://github.com/anymirror-dev/anymirror/issues"
   },
@@ -69,5 +69,8 @@
   },
   "dependencies": {
     "@anymirror/router": "^0.7.0-alpha.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

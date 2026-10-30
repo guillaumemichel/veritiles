@@ -53,6 +53,6 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "anymirror": "0.7.0-alpha.0"
+    "@anymirror/core": "0.7.0-alpha.0"
   }
 }

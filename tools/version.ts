@@ -1,5 +1,5 @@
-// Sets the version line: anymirror, @anymirror/fisl-router and veritiles move
-// together, and veritiles pins anymirror at the same version.
+// Sets the version line: @anymirror/core, @anymirror/fisl-router and veritiles
+// move together, and veritiles pins @anymirror/core at the same version.
 // @anymirror/router is versioned on its own and changes only with the
 // contract, by hand. Run `npm install` after, so the lockfile follows.
 //
@@ -7,7 +7,8 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 
-const LINE = ['anymirror', 'fisl-router', 'veritiles'];
+const LINE = ['core', 'fisl-router', 'veritiles'];
+const CORE = '@anymirror/core';
 const VERSION_RE = /^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/;
 
 const version = process.argv[2];
@@ -19,7 +20,7 @@ if (version === undefined || !VERSION_RE.test(version)) {
 for (const dir of LINE) {
   const path = new URL(`../packages/${dir}/package.json`, import.meta.url);
   const pkg = JSON.parse(await readFile(path, 'utf8'));
-  const dependencies = pkg.dependencies?.anymirror === undefined ? pkg.dependencies : { ...pkg.dependencies, anymirror: version };
+  const dependencies = pkg.dependencies?.[CORE] === undefined ? pkg.dependencies : { ...pkg.dependencies, [CORE]: version };
   await writeFile(path, `${JSON.stringify({ ...pkg, version, dependencies }, null, 2)}\n`);
 }
-console.log(`${LINE.join(', ')} at ${version}: run npm install to update the lockfile`);
+console.log(`the version line at ${version}: run npm install to update the lockfile`);

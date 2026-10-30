@@ -12,8 +12,8 @@ import { CID } from 'multiformats/cid';
 import * as Digest from 'multiformats/hashes/digest';
 
 import { VerifiedSource } from '../packages/veritiles/src/index.ts';
-import { decodeDescriptor } from '../packages/anymirror/src/descriptor.ts';
-import { decodeMeta, KIND_SHARD } from '../packages/anymirror/src/proof-format.ts';
+import { decodeDescriptor } from '../packages/core/src/descriptor.ts';
+import { decodeMeta, KIND_SHARD } from '../packages/core/src/proof-format.ts';
 import { buildProofPackage } from './helpers/package.ts';
 import { servePackage } from './helpers/serve-file.ts';
 import { blake3Bytes, sha256Bytes } from './helpers/bytes.ts';

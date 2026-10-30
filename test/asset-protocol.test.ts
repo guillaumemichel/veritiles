@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { VerifiedAsset } from '../packages/veritiles/src/asset.ts';
-import { NotFoundError } from '../packages/anymirror/src/bundle.ts';
+import { NotFoundError } from '../packages/core/src/bundle.ts';
 import { assetProtocol } from '../packages/veritiles/src/asset-protocol.ts';
-import { VerificationError } from '../packages/anymirror/src/verify.ts';
+import { VerificationError } from '../packages/core/src/verify.ts';
 import { buildArtifact, serveArtifact } from './helpers/artifact.ts';
 import { buildRaw, buildTree, TREE_ENTRIES } from './helpers/fixtures.ts';
 

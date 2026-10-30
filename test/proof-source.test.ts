@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { parseCid } from '../packages/anymirror/src/cid.ts';
-import { ProofSource } from '../packages/anymirror/src/proof-source.ts';
-import { RangeSource } from '../packages/anymirror/src/range-source.ts';
+import { parseCid } from '../packages/core/src/cid.ts';
+import { ProofSource } from '../packages/core/src/proof-source.ts';
+import { RangeSource } from '../packages/core/src/range-source.ts';
 import { buildArtifact, serveArtifact } from './helpers/artifact.ts';
 import { TREE_ENTRIES } from './helpers/fixtures.ts';
 import { fixedLocations } from './helpers/store.ts';

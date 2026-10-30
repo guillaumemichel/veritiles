@@ -14,7 +14,7 @@ import {
   VerifiedBundle,
   VerifiedRaw,
   type VerifyStats,
-} from 'anymirror';
+} from '@anymirror/core';
 
 export interface VerifiedAssetOptions {
   /** Content anchor: raw for one file or dag-cbor for a MASL bundle. */

@@ -8,9 +8,9 @@ import {
   RangeBlockedError,
   RangeSource,
   RangeUnsupportedError,
-} from '../packages/anymirror/src/range-source.ts';
+} from '../packages/core/src/range-source.ts';
 import type { FetchContext, Router, Verdict } from '../packages/router/src/index.ts';
-import { VerificationError } from '../packages/anymirror/src/verify.ts';
+import { VerificationError } from '../packages/core/src/verify.ts';
 import { deterministicBytes } from './helpers/bytes.ts';
 import { rangeFetch } from './helpers/host.ts';
 

@@ -10,10 +10,10 @@ import {
   shardLeavesFor,
   shardName,
   validateShard,
-} from '../packages/anymirror/src/proof-format.ts';
-import { toHex, VerificationError } from '../packages/anymirror/src/verify.ts';
+} from '../packages/core/src/proof-format.ts';
+import { toHex, VerificationError } from '../packages/core/src/verify.ts';
 import { deterministicBytes } from './helpers/bytes.ts';
-import { encodeMeta, encodeShard } from '../packages/anymirror/src/proof-format.ts';
+import { encodeMeta, encodeShard } from '../packages/core/src/proof-format.ts';
 
 const digest = (seed: number) => deterministicBytes(32, seed);
 

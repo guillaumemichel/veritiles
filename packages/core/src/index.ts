@@ -1,6 +1,6 @@
-// anymirror: every reader. Each also has an entry point of its own
-// (`anymirror/file`, `/raw`, `/bundle`, `/hints`): a page without a bundler
-// imports the one it reads and loads nothing else.
+// @anymirror/core: every reader. Each also has an entry point of its own
+// (`@anymirror/core/file`, `/raw`, `/bundle`, `/hints`): a page without a
+// bundler imports the one it reads and loads nothing else.
 
 export { VerifiedFile } from './verified-file.ts';
 export type { VerifiedFileOptions } from './verified-file.ts';

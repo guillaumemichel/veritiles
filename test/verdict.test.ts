@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import type { Verdict } from '../packages/router/src/index.ts';
-import { Tally, verdictOf } from '../packages/anymirror/src/verdict.ts';
-import { VerificationError } from '../packages/anymirror/src/verify.ts';
+import { Tally, verdictOf } from '../packages/core/src/verdict.ts';
+import { VerificationError } from '../packages/core/src/verify.ts';
 
 function tallied() {
   const settled: Verdict[] = [];

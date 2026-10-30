@@ -1,8 +1,9 @@
 # Publish to npm on a version tag (v1.2.3): every package whose version npm
-# does not have yet. anymirror, @anymirror/fisl-router and veritiles share the
-# version line, which the tag names; @anymirror/router moves only when the
-# contract changes, so most releases leave it as it is. Publishing to npm is all a CDN needs: unpkg and
-# jsDelivr mirror the registry automatically.
+# does not have yet. @anymirror/core, @anymirror/fisl-router and veritiles
+# share the version line, which the tag names; @anymirror/router moves only
+# when the contract changes, so most releases leave it as it is. Publishing
+# to npm is all a CDN needs: unpkg and jsDelivr mirror the registry
+# automatically.
 #
 # Auth is npm TRUSTED PUBLISHING (OIDC): no tokens, and provenance
 # attestations are generated automatically. Each package names this workflow
@@ -30,9 +31,9 @@ jobs:
       - run: npm ci
       - name: Tag must match the version line
         run: |
-          version="v$(node -p "require('./packages/anymirror/package.json').version")"
+          version="v$(node -p "require('./packages/core/package.json').version")"
           if [ "$version" != "$GITHUB_REF_NAME" ]; then
-            echo "tag $GITHUB_REF_NAME does not match anymirror's version $version" >&2
+            echo "tag $GITHUB_REF_NAME does not match @anymirror/core's version $version" >&2
             exit 1
           fi
       - run: npm run typecheck
@@ -43,7 +44,7 @@ jobs:
       # goes out under `next`, never `latest`.
       - name: Publish the versions npm lacks
         run: |
-          for dir in router anymirror fisl-router veritiles; do
+          for dir in router core fisl-router veritiles; do
             name=$(node -p "require('./packages/$dir/package.json').name")
             version=$(node -p "require('./packages/$dir/package.json').version")
             if [ -n "$(npm view "$name@$version" version 2>/dev/null)" ]; then

@@ -24,7 +24,7 @@ const source = new VerifiedSource({ cid: "bafyrei…", router });
 ```
 
 Every anymirror reader takes it the same way, as its `router` option:
-`new VerifiedFile({ cid, router })` from `anymirror/file`, for one.
+`new VerifiedFile({ cid, router })` from `@anymirror/core/file`, for one.
 
 The page may hold only the anchor. The reader asks the router for the
 anchor, reads the descriptor at the URL it gets

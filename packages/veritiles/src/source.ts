@@ -14,7 +14,7 @@
 // the configured anchor CID, so a wrong or malicious host merely fails
 // verification and the next source is tried.
 
-import type { VerifyStats } from 'anymirror';
+import type { VerifyStats } from '@anymirror/core';
 
 import { VerifiedFile, type VerifiedFileOptions } from './hinted-file.ts';
 

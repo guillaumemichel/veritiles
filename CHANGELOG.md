@@ -8,11 +8,11 @@ fix).
 
 ### Added
 
-- **anymirror**: the readers on their own, without the map adapters, each
-  behind its own entry point: `anymirror/file` (`VerifiedFile`, one large
-  file by byte ranges), `anymirror/raw` (`VerifiedRaw`, one small file),
-  `anymirror/bundle` (`VerifiedBundle`, a MASL bundle) and `anymirror/hints`
-  (`hints()`). A page carries only the reader it uses: gzipped, a raw file
+- **@anymirror/core**: the readers on their own, without the map adapters,
+  each behind its own entry point: `@anymirror/core/file` (`VerifiedFile`,
+  one large file by byte ranges), `@anymirror/core/raw` (`VerifiedRaw`, one
+  small file), `@anymirror/core/bundle` (`VerifiedBundle`, a MASL bundle)
+  and `@anymirror/core/hints` (`hints()`). A page carries only the reader it uses: gzipped, a raw file
   costs 4.4 KB, a bundle 6.8 KB and a ranged file 8.5 KB, where every page
   carried 8.4 to 9.2 KB before. `assetKind(cid)` says which reader an asset
   anchor needs.
@@ -28,9 +28,9 @@ fix).
 - **Hints as a plugin** ([`SPEC.md` §5](https://github.com/anymirror-dev/anymirror/blob/v0.7.0/SPEC.md#5-routing-hints)):
   hints documents and discovery are a client option, off in anymirror's
   readers unless a page passes `hints()`. veritiles keeps them on by default.
-- veritiles is built on anymirror and pins it at the same version. Its API
-  and behavior are unchanged; the map bundle grows by 0.5 KB gzipped (11.7 to
-  12.2 KB) for the seams between the readers.
+- veritiles is built on `@anymirror/core` and pins it at the same version.
+  Its API and behavior are unchanged; the map bundle grows by 0.5 KB gzipped
+  (11.7 to 12.2 KB) for the seams between the readers.
 - The repository is now `anymirror-dev/anymirror`, and the spec is the
   anymirror spec. The packer is `anymirror-pack`, installed with
   `cargo install --path packer`; the TypeScript packer stays in the

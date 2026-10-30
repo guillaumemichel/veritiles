@@ -5,8 +5,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { type RangedByteSource, RangedStore } from '../packages/anymirror/src/ranged-store.ts';
-import { VerificationError } from '../packages/anymirror/src/verify.ts';
+import { type RangedByteSource, RangedStore } from '../packages/core/src/ranged-store.ts';
+import { VerificationError } from '../packages/core/src/verify.ts';
 import { deterministicBytes, flipByte, sha256Hex } from './helpers/bytes.ts';
 import { memorySource as source, okCheck, rangedStoreOf as storeOf, routedHosts } from './helpers/store.ts';
 

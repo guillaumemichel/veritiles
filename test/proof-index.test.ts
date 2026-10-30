@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { decodeDescriptor } from '../packages/anymirror/src/descriptor.ts';
-import { KIND_SHARD } from '../packages/anymirror/src/proof-format.ts';
-import { ProofIndex } from '../packages/anymirror/src/proof-index.ts';
-import { RangeSource } from '../packages/anymirror/src/range-source.ts';
-import { toHex } from '../packages/anymirror/src/verify.ts';
+import { decodeDescriptor } from '../packages/core/src/descriptor.ts';
+import { KIND_SHARD } from '../packages/core/src/proof-format.ts';
+import { ProofIndex } from '../packages/core/src/proof-index.ts';
+import { RangeSource } from '../packages/core/src/range-source.ts';
+import { toHex } from '../packages/core/src/verify.ts';
 import { deterministicBytes, flipByte, sha256Bytes } from './helpers/bytes.ts';
 import { gatedFetch } from './helpers/gated-fetch.ts';
 import { rangeFetch, type HostOptions } from './helpers/host.ts';
 import { buildProofPackage, type ProofPackage } from './helpers/package.ts';
 import { storeOf } from './helpers/store.ts';
-import { encodeMeta, encodeShard } from '../packages/anymirror/src/proof-format.ts';
+import { encodeMeta, encodeShard } from '../packages/core/src/proof-format.ts';
 
 const mapBytes = deterministicBytes(4000, 40);
 const cuts = [100, 900, 2000, 500, 500];

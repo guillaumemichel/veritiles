@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { parseCid } from '../packages/anymirror/src/cid.ts';
+import { parseCid } from '../packages/core/src/cid.ts';
 import { deterministicBytes } from './helpers/bytes.ts';
 import { box, concat, fragment } from './helpers/mp4-writer.ts';
 import { writePmtilesArchive } from './helpers/pmtiles-writer.ts';

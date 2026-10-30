@@ -7,8 +7,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { DefaultRouter, type DefaultRouterOptions } from '../packages/anymirror/src/default-router.ts';
-import { hints } from '../packages/anymirror/src/hints.ts';
+import { DefaultRouter, type DefaultRouterOptions } from '../packages/core/src/default-router.ts';
+import { hints } from '../packages/core/src/hints.ts';
 import { withPageUrl } from './helpers/serve-hints.ts';
 
 const ANCHOR = 'bafyreiazjnja3qydqsz7yiz6ci3xra26flodmlmry3rtafpnhwzdphl6ue';

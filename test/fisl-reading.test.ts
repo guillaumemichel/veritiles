@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { VerifiedFile } from '../packages/anymirror/src/verified-file.ts';
+import { VerifiedFile } from '../packages/core/src/verified-file.ts';
 
 import { packFixed } from '../tools/pack.ts';
 import { fisl } from '../packages/fisl-router/src/index.ts';

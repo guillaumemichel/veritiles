@@ -11,11 +11,11 @@ import { test } from 'node:test';
 import { PMTiles } from 'pmtiles';
 
 import { VerifiedAsset } from '../packages/veritiles/src/asset.ts';
-import { hints } from '../packages/anymirror/src/hints.ts';
+import { hints } from '../packages/core/src/hints.ts';
 import type { FetchContext, Router } from '../packages/router/src/index.ts';
-import { send, toRouter } from '../packages/anymirror/src/routing.ts';
+import { send, toRouter } from '../packages/core/src/routing.ts';
 import { VerifiedSource } from '../packages/veritiles/src/source.ts';
-import { VerifiedFile } from '../packages/anymirror/src/verified-file.ts';
+import { VerifiedFile } from '../packages/core/src/verified-file.ts';
 import { packPmtiles } from '../tools/pack.ts';
 import { buildArtifact, serveArtifact } from './helpers/artifact.ts';
 import { deterministicBytes, flipByte } from './helpers/bytes.ts';

@@ -10,7 +10,7 @@ passes verification.
 | `VerifiedRaw`    | one small file                  | whole file  | raw CID                                     |
 | `VerifiedBundle` | path-addressed bundle           | whole files | strict MASL bundle in a CARv1 bag           |
 
-The clients are the `anymirror` package's readers. veritiles, its map
+The clients are the readers of the `@anymirror/core` package. veritiles, its map
 package, adds `VerifiedAsset`, which takes either asset anchor and reads it
 with `VerifiedRaw` or `VerifiedBundle`, as the anchor's codec says.
 

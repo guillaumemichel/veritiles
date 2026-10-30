@@ -1,4 +1,4 @@
-// anymirror/file: one large file, such as PMTiles or a video, read by byte
+// @anymirror/core/file: one large file, such as PMTiles or a video, read by byte
 // ranges, each verified before it is handed over (SPEC §2).
 
 export { VerifiedFile } from '../verified-file.ts';

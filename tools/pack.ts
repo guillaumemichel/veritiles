@@ -23,9 +23,9 @@ import { brotliDecompressSync, gunzipSync, zstdDecompressSync } from 'node:zlib'
 import { createBLAKE3 } from 'hash-wasm';
 import { bytesToHeader, Compression, SharedPromiseCache, type Entry, type Header, type Source } from 'pmtiles';
 
-import { encodeDescriptor } from '../packages/anymirror/src/descriptor.ts';
-import { encodeManifest } from '../packages/anymirror/src/manifest.ts';
-import { DESCRIPTOR_CAP } from '../packages/anymirror/src/limits.ts';
+import { encodeDescriptor } from '../packages/core/src/descriptor.ts';
+import { encodeManifest } from '../packages/core/src/manifest.ts';
+import { DESCRIPTOR_CAP } from '../packages/core/src/limits.ts';
 import {
   encodeMeta,
   encodeShard,
@@ -34,8 +34,8 @@ import {
   MAX_SHARD_RECORDS,
   META_RECORD_SIZE,
   shardName,
-} from '../packages/anymirror/src/proof-format.ts';
-import { VerifiedFile } from '../packages/anymirror/src/verified-file.ts';
+} from '../packages/core/src/proof-format.ts';
+import { VerifiedFile } from '../packages/core/src/verified-file.ts';
 
 const RAW_CODE = 0x55;
 const SHA2_256 = 0x12;

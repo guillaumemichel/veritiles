@@ -12,10 +12,13 @@ compromised host can withhold bytes (visible), but cannot alter one undetected:
 tampered bytes fail verification, are counted, and are never rendered. With
 more than one source configured, a bad host is skipped for the next.
 
-veritiles is the map package of [anymirror](https://github.com/anymirror-dev/anymirror/tree/main/packages/anymirror): its readers
-are anymirror's, with hints documents on by default, plus a PMTiles `Source`
-and a MapLibre protocol for verified assets. A page that reads a file or an
-asset without a map carries less with anymirror alone.
+veritiles is the map package of
+[anymirror](https://github.com/anymirror-dev/anymirror): its readers are
+those of
+[`@anymirror/core`](https://github.com/anymirror-dev/anymirror/tree/main/packages/core),
+with hints documents on by default, plus a PMTiles `Source` and a MapLibre
+protocol for verified assets. A page that reads a file or an asset without a
+map carries less with `@anymirror/core` alone.
 
 The integrity proof is a small directory of static files: a tiny **descriptor**
 (the anchor's block) plus a tree of digest files. The client downloads only the
@@ -23,7 +26,7 @@ pieces covering what it reads — a tile fetch costs at most a couple of small
 proof files, even for a planet-size archive — and verifies every byte against
 the sha2-256 chain rooted in the anchor (see [`SPEC.md`](https://github.com/anymirror-dev/anymirror/blob/main/SPEC.md)).
 
-- **No third-party dependencies** — anymirror is its only one. The
+- **No third-party dependencies** — `@anymirror/core` is its only one. The
   script-tag bundle holds everything in ~37 KB minified (12.5 KB gzipped),
   including CID, DRISL/CBOR, and CAR handling. WebCrypto is the only
   cryptography.

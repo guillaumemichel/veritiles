@@ -4,8 +4,8 @@ import { test } from 'node:test';
 import { CID } from 'multiformats/cid';
 import * as Digest from 'multiformats/hashes/digest';
 
-import { decodeDescriptor, encodeDescriptor } from '../packages/anymirror/src/descriptor.ts';
-import { encodeMeta, KIND_SHARD } from '../packages/anymirror/src/proof-format.ts';
+import { decodeDescriptor, encodeDescriptor } from '../packages/core/src/descriptor.ts';
+import { encodeMeta, KIND_SHARD } from '../packages/core/src/proof-format.ts';
 import { sha256Bytes } from './helpers/bytes.ts';
 
 const raw = CID.createV1(0x55, Digest.create(0x1e, sha256Bytes(Uint8Array.of(1))));

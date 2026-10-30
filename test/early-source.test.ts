@@ -5,10 +5,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { EarlySource } from '../packages/anymirror/src/early-source.ts';
+import { EarlySource } from '../packages/core/src/early-source.ts';
 import type { Verdict } from '../packages/router/src/index.ts';
-import type { Body } from '../packages/anymirror/src/verdict.ts';
-import type { RangedByteSource } from '../packages/anymirror/src/ranged-store.ts';
+import type { Body } from '../packages/core/src/verdict.ts';
+import type { RangedByteSource } from '../packages/core/src/ranged-store.ts';
 
 interface Call {
   what: string;

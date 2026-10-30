@@ -1,4 +1,4 @@
-// anymirror/raw: one small file, fetched whole and hashed against its raw
+// @anymirror/core/raw: one small file, fetched whole and hashed against its raw
 // CID (SPEC §3.1).
 
 export { VerifiedRaw } from '../raw.ts';

@@ -1,6 +1,6 @@
 # Releasing
 
-The repeatable runbook for cutting a release of the packages: `anymirror`,
+The repeatable runbook for cutting a release of the packages: `@anymirror/core`,
 `@anymirror/fisl-router`, `veritiles` and, when its contract changed,
 `@anymirror/router`. Replace
 `X.Y.Z` with the target version throughout. Do the steps in order; the gate
@@ -15,14 +15,15 @@ Pre-1.0 SemVer: **minor** (`0.3.x → 0.4.0`) for a new feature, **patch**
 or MASL manifest — or a removed/renamed public option. Widening an option
 (e.g. making a field optional) is not breaking.
 
-`anymirror`, `@anymirror/fisl-router` and `veritiles` share one version line
-and are released together: veritiles pins anymirror at its own version. `@anymirror/router` has a
+`@anymirror/core`, `@anymirror/fisl-router` and `veritiles` share one version
+line and are released together: veritiles pins `@anymirror/core` at its own
+version. `@anymirror/router` has a
 version of its own and moves only when the contract changes, so routers
 written for it keep working across releases; most releases leave it alone.
 
 ## What holds the version
 
-- The version line lives in the `package.json` of `packages/anymirror`,
+- The version line lives in the `package.json` of `packages/core`,
   `packages/fisl-router` and `packages/veritiles`, plus veritiles' dependency
   on anymirror; `npm run version:line -- X.Y.Z` sets all four, and `npm install` then
   updates `package-lock.json`. The tag must name the line's version.
@@ -119,7 +120,7 @@ trust-critical `<script>` include, prefer pin + SRI (`integrity=…`,
 ```
 npm run version:line -- X.Y.Z && npm install   # the line, and veritiles' pin
 # only if the contract changed: packages/router/package.json's version, and
-# the range for it in packages/anymirror and packages/fisl-router
+# the range for it in packages/core and packages/fisl-router
 git add -A            # confirm `git status` shows only release files
 git commit -m "chore: release vX.Y.Z"
 git tag -a vX.Y.Z -m "vX.Y.Z"          # tag body = the CHANGELOG entry
@@ -132,7 +133,7 @@ either shape is fine.
 ## 5. Push — CI publishes
 
 Publishing is automated: `.github/workflows/release.yml` fires on the
-`vX.Y.Z` tag push, checks the tag against anymirror's version, re-runs the
+`vX.Y.Z` tag push, checks the tag against `@anymirror/core`'s version, re-runs the
 gate, then publishes every package whose version npm does not have yet, the
 contract first, with trusted publishing (OIDC — no tokens, provenance
 attestations included). A prerelease version goes out under the `next`
@@ -156,7 +157,7 @@ fails, and a local publish carries no provenance. Two exceptions:
 ## 6. Verify
 
 - The Release workflow run for `vX.Y.Z` is green
-- `npm view <name> version` → `X.Y.Z` for `anymirror`,
+- `npm view <name> version` → `X.Y.Z` for `@anymirror/core`,
   `@anymirror/fisl-router` and `veritiles`, and so does `dist-tags.latest`
 - if the contract changed, `npm view @anymirror/router version` → its new
   version

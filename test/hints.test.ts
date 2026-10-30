@@ -8,10 +8,10 @@ import { test } from 'node:test';
 import { CID } from 'multiformats/cid';
 import * as Digest from 'multiformats/hashes/digest';
 
-import { cidToText, parseCid } from '../packages/anymirror/src/cid.ts';
-import { HintResolver, parseHintsDocument } from '../packages/anymirror/src/hints.ts';
-import { MAX_HINT_BYTES } from '../packages/anymirror/src/limits.ts';
-import type { FetchFn } from '../packages/anymirror/src/routing.ts';
+import { cidToText, parseCid } from '../packages/core/src/cid.ts';
+import { HintResolver, parseHintsDocument } from '../packages/core/src/hints.ts';
+import { MAX_HINT_BYTES } from '../packages/core/src/limits.ts';
+import type { FetchFn } from '../packages/core/src/routing.ts';
 import { withPageUrl } from './helpers/serve-hints.ts';
 
 const SHA2_256 = 0x12;

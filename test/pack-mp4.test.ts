@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { isFragmentedMp4, mp4Cuts, pack, packMp4, verifyBytes } from '../tools/pack.ts';
-import { VerifiedFile } from '../packages/anymirror/src/verified-file.ts';
+import { VerifiedFile } from '../packages/core/src/verified-file.ts';
 import { deterministicBytes } from './helpers/bytes.ts';
 import { box, concat, fragment, header, largeBox, openBox } from './helpers/mp4-writer.ts';
 import { servePackage } from './helpers/serve-file.ts';

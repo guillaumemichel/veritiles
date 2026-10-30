@@ -2,11 +2,11 @@
 // locations are the page's own, all there at once. And the in-memory hosts
 // the store tests read from.
 
-import { type DefaultLocations, Locator, type Locations } from '../../packages/anymirror/src/locations.ts';
-import { type RangedByteSource, RangedStore } from '../../packages/anymirror/src/ranged-store.ts';
+import { type DefaultLocations, Locator, type Locations } from '../../packages/core/src/locations.ts';
+import { type RangedByteSource, RangedStore } from '../../packages/core/src/ranged-store.ts';
 import type { Router, Verdict } from '../../packages/router/src/index.ts';
-import { type ByteSource, VerifiedStore, type VerifyStats } from '../../packages/anymirror/src/verified-store.ts';
-import { equalBytes, VerificationError } from '../../packages/anymirror/src/verify.ts';
+import { type ByteSource, VerifiedStore, type VerifyStats } from '../../packages/core/src/verified-store.ts';
+import { equalBytes, VerificationError } from '../../packages/core/src/verify.ts';
 
 export function fixedLocations(urls: string[], cid = 'fixed'): Locations {
   const page = { open: () => ({ configured: urls, rest: (async function* () {})() }), consulted: () => [] };

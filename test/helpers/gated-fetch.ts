@@ -3,7 +3,7 @@
 // before any answer arrives. Wraps any responder (e.g. servePackage's fetch).
 // Labels are the URL, plus ` bytes=a-b` for a ranged request.
 
-import type { FetchFn } from '../../packages/anymirror/src/routing.ts';
+import type { FetchFn } from '../../packages/core/src/routing.ts';
 
 interface Held {
   label: string;

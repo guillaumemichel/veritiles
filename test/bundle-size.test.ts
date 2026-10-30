@@ -11,8 +11,8 @@ import { build } from 'esbuild';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-// A module of anymirror, as the bundle's metafile names it.
-const core = (...names: string[]) => names.map((name) => `packages/anymirror/src/${name}.ts`);
+// A module of @anymirror/core, as the bundle's metafile names it.
+const core = (...names: string[]) => names.map((name) => `packages/core/src/${name}.ts`);
 
 const RANGED = core('descriptor', 'proof-format', 'proof-index', 'ranged-reader', 'ranged-store', 'range-source', 'early-source');
 
@@ -27,19 +27,19 @@ interface Use {
 const USES: Use[] = [
   {
     name: 'raw file',
-    entry: "export { VerifiedRaw } from 'anymirror/raw';",
+    entry: "export { VerifiedRaw } from '@anymirror/core/raw';",
     budget: 4_450,
     without: [...RANGED, ...core('hints', 'manifest', 'car', 'drisl', 'proof-source')],
   },
   {
     name: 'MASL bundle',
-    entry: "export { VerifiedBundle } from 'anymirror/bundle';",
+    entry: "export { VerifiedBundle } from '@anymirror/core/bundle';",
     budget: 6_900,
     without: [...RANGED, ...core('hints')],
   },
   {
     name: 'ranged file',
-    entry: "export { VerifiedFile } from 'anymirror/file';",
+    entry: "export { VerifiedFile } from '@anymirror/core/file';",
     budget: 8_600,
     without: core('hints', 'manifest', 'car', 'proof-source'),
   },
