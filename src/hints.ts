@@ -3,13 +3,15 @@
 // fetched through a hint is verified against the anchor chain exactly as a
 // configured URL is — so parsing is deliberately tolerant: salvage every valid
 // entry, ignore the rest, and never throw a VerificationError. Only a
-// non-object body or the size cap rejects a whole document.
+// non-object body or the size cap rejects a whole document. A page turns
+// hints on with the plugin `hints()`.
 
 import { cidToText, tryParseCid } from './cid.ts';
+import type { AnchorKind, HintedLocations, Hints, HintsClient } from './default-router.ts';
 import { MAX_HINT_BYTES, MAX_HINT_DOCS, MAX_HINT_URLS_PER_CID } from './limits.ts';
 import { readBody } from './read-body.ts';
 import type { FetchFn } from './routing.ts';
-import { resolveLocation } from './url.ts';
+import { containingDir, resolveLocation, rootOf } from './url.ts';
 
 const DEFAULT_HINTS_URL = './hints.json';
 const decoder = new TextDecoder();
@@ -180,5 +182,98 @@ function resolveDocUrl(spec: string, base: string | undefined, explicit: boolean
   } catch {
     if (explicit) throw new Error(`hints URL '${spec}' is relative but no base URL is available`);
     return null;
+  }
+}
+
+// The hints plugin: hints documents and discovery for the built-in router,
+// the documents `urls` names or, without, `./hints.json` beside the page.
+// After a CID's configured locations come the documents': an explicit
+// document is always consulted, fetched in the background from the first
+// open on; the default one only for a CID with nothing configured. Then, for
+// a CID still without a location, documents probed beside the page's own
+// locations: the anchor's beside its sources, any other CID's beside the
+// anchor's.
+export function hints(urls?: string | string[]): Hints {
+  return { explicit: urls !== undefined, open: (client) => new HintedRouter(urls, client) };
+}
+
+// The plugin for one client.
+class HintedRouter implements HintedLocations {
+  #anchor: string;
+  #kind: AnchorKind;
+  #sources: string[];
+  #anchorLocations: string[];
+  #explicit: boolean;
+  #resolver: HintResolver;
+
+  constructor(urls: string | string[] | undefined, { anchor, kind, sources, anchorLocations, fetchFn }: HintsClient) {
+    this.#anchor = anchor;
+    this.#kind = kind;
+    this.#sources = sources;
+    this.#anchorLocations = anchorLocations;
+    this.#explicit = urls !== undefined;
+    this.#resolver = new HintResolver({ hints: urls, fetchFn });
+  }
+
+  // A microtask later, so the requests to configured locations leave first.
+  opened(): void {
+    if (this.#explicit) queueMicrotask(() => void this.#resolver.load());
+  }
+
+  consulted(): string[] {
+    return this.#resolver.consulted();
+  }
+
+  // After the configured locations: the documents' — explicit ones always,
+  // the default one only when nothing is configured — then, still nothing,
+  // the probes'.
+  async *rest(cid: string, configured: boolean): AsyncGenerator<string> {
+    const hinted = this.#explicit || !configured ? await this.#hinted(cid) : [];
+    yield* hinted;
+    if (configured || hinted.length) return;
+    yield* await this.#probe(cid);
+  }
+
+  async #hinted(cid: string): Promise<string[]> {
+    return this.#asLocations(cid, await this.#resolver.urlsFor(cid));
+  }
+
+  // Hinted URLs as a CID's locations. A ranged file's anchor is hinted by its
+  // proof base, whose `{u}/root` locates its bytes; a base with a query
+  // string has no clean `/root` and is dropped.
+  #asLocations(cid: string, urls: string[]): string[] {
+    if (cid !== this.#anchor || this.#kind !== 'ranged') return urls;
+    return urls.filter((url) => !url.includes('?')).map(rootOf);
+  }
+
+  // SPEC §5 discovery. The anchor probes beside each source: its containing
+  // directory may hold a document naming the proofs. Any other CID probes
+  // beside the anchor's configured and hinted locations, newly hinted ones
+  // included, until it is found or the directories run out. A raw file has
+  // nothing to probe beside.
+  async #probe(cid: string): Promise<string[]> {
+    if (cid === this.#anchor) {
+      if (!this.#sources.length) return [];
+      for (const source of this.#sources) await this.#resolver.probe(containingDir(source));
+      return this.#asLocations(cid, this.#resolver.known(cid));
+    }
+    const probed = new Set<string>();
+    for (;;) {
+      const anchorLocations = [...new Set([...this.#anchorLocations, ...this.#asLocations(this.#anchor, this.#resolver.known(this.#anchor))])];
+      const dirs = anchorLocations.map((location) => this.#besideAnchor(location)).filter((dir) => !probed.has(dir));
+      if (!dirs.length) return [];
+      for (const dir of dirs) {
+        probed.add(dir);
+        await this.#resolver.probe(dir);
+      }
+      const urls = this.#resolver.known(cid);
+      if (urls.length) return urls;
+    }
+  }
+
+  // The directory beside an anchor location: a ranged file's proof base (the
+  // directory `{proof}/root` sits in), a bundle proof file's containing one.
+  #besideAnchor(location: string): string {
+    return this.#kind === 'ranged' ? location.slice(0, -'/root'.length) : containingDir(location);
   }
 }

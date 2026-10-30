@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import { CID } from 'multiformats/cid';
 import * as Digest from 'multiformats/hashes/digest';
 
+import { hints } from '../src/hints.ts';
 import { VerifiedFile } from '../src/verified-file.ts';
 import { VerificationError } from '../src/verify.ts';
 import { flipByte, sha256Bytes } from './helpers/bytes.ts';
@@ -60,9 +61,9 @@ test('F-01: constructor validation', async () => {
   assert.doesNotThrow(() => new VerifiedFile({ cid: good.anchor, source: 'https://h/f?v=1', proof: 'https://h/p' }));
   // Locations are optional now: a bare anchor, or an anchor + hints, both construct.
   assert.doesNotThrow(() => new VerifiedFile({ cid: good.anchor }));
-  assert.doesNotThrow(() => new VerifiedFile({ cid: good.anchor, hints: 'https://h/hints.json' }));
+  assert.doesNotThrow(() => new VerifiedFile({ cid: good.anchor, hints: hints('https://h/hints.json') }));
   // A query-string source with no proof but explicit hints defers the proof question to open.
-  assert.doesNotThrow(() => new VerifiedFile({ cid: good.anchor, source: 'https://h/f?v=1', hints: 'https://h/hints.json' }));
+  assert.doesNotThrow(() => new VerifiedFile({ cid: good.anchor, source: 'https://h/f?v=1', hints: hints('https://h/hints.json') }));
 });
 
 // F-02 — proof base derivation and ready().

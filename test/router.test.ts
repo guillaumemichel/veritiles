@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import { PMTiles } from 'pmtiles';
 
 import { VerifiedAsset } from '../src/asset.ts';
+import { hints } from '../src/hints.ts';
 import type { FetchContext, Router } from '../src/router.ts';
 import { send, toRouter } from '../src/routing.ts';
 import { VerifiedSource } from '../src/source.ts';
@@ -225,16 +226,16 @@ test('RF-06: the real pmtiles reader over a router-only page', async () => {
   assert.deepEqual(new Uint8Array((await pm.getZxy(1, 1, 0))!.data), deterministicBytes(2048, 3));
 });
 
-test('RF-07: the default hints document is among the defaults: consulted only by a router that reads them', async () => {
+test('RF-07: with hints on, the default hints document is among the defaults: consulted only by a router that reads them', async () => {
   const pkg = await buildPkgFlat();
   const HOST = 'https://host.example/world.pmtiles';
   const { fetchFn, requests } = scene([{ fileUrl: HOST, bytes: pkg.mapBytes, proofs: pkg.proofs }], {});
   const table = { [pkg.anchor]: [`${HOST}.proofs/root`], [pkg.mapCid]: [HOST] };
   await withPageUrl('https://app.example/map.html', async () => {
-    const own = new VerifiedFile({ cid: pkg.anchor, router: tableRouter(table).router, fetchFn });
+    const own = new VerifiedFile({ cid: pkg.anchor, router: tableRouter(table).router, fetchFn, hints: hints() });
     assert.deepEqual(await own.read(0, 100), pkg.mapBytes.subarray(0, 100));
     assert.equal(requests.includes('https://app.example/hints.json'), false, 'its defaults unread');
-    const fallback = new VerifiedFile({ cid: pkg.anchor, router: tableRouter(table, { fallback: true }).router, fetchFn });
+    const fallback = new VerifiedFile({ cid: pkg.anchor, router: tableRouter(table, { fallback: true }).router, fetchFn, hints: hints() });
     assert.deepEqual(await fallback.read(0, 100), pkg.mapBytes.subarray(0, 100));
     assert.ok(requests.includes('https://app.example/hints.json'), 'read through its defaults');
   });

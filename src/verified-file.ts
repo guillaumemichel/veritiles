@@ -13,7 +13,7 @@
 
 import { abortable } from './abortable.ts';
 import { type Cid, cidToText, parseFileAnchor } from './cid.ts';
-import { DefaultRouter } from './default-router.ts';
+import { DefaultRouter, type Hints } from './default-router.ts';
 import { openDescriptor } from './descriptor.ts';
 import { EarlySource } from './early-source.ts';
 import { DEFAULT_MAX_CACHE_BYTES, PROOF_CACHE_BYTES } from './limits.ts';
@@ -43,13 +43,12 @@ export interface VerifiedFileOptions {
    */
   proof?: string | string[];
   /**
-   * Routing-hints document URL(s), untrusted (SPEC §5). An explicit document
-   * is consulted for every CID, fetched in the background from the open on;
-   * its URLs follow the configured ones. The default (`./hints.json` beside
-   * the page) is consulted only for a CID with nothing configured. Every
-   * hinted byte is verified against the anchor exactly as a configured one.
+   * Hints documents and discovery, untrusted (SPEC §5): `hints()` turns them
+   * on, `hints(url)` names the documents. Off by default: the file is read
+   * at its configured locations and its router's alone. Every hinted byte
+   * is verified against the anchor exactly as a configured one.
    */
-  hints?: string | string[];
+  hints?: Hints;
   /**
    * Router, untrusted (SPEC §6): where a CID's bytes may live. It replaces
    * the built-in router, which it gets as `defaults` (the locations `source`,

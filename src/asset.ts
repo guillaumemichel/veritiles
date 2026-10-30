@@ -8,6 +8,7 @@
 import { abortable } from './abortable.ts';
 import { type Cid, cidToText, DAG_CBOR_CODE, parseAssetAnchor } from './cid.ts';
 import { DefaultRouter } from './default-router.ts';
+import { hints } from './hints.ts';
 import { HttpSource } from './http-source.ts';
 import {
   ASSET_WHOLE_CAP,
@@ -53,7 +54,7 @@ export class VerifiedAsset {
   #fileStore: VerifiedStore;
 
   constructor(options: VerifiedAssetOptions) {
-    const { cid, source, proof, hints, router, fetchFn, maxCacheBytes, maxProofBytes, maxFileBytes } = options;
+    const { cid, source, proof, hints: hintUrls, router, fetchFn, maxCacheBytes, maxProofBytes, maxFileBytes } = options;
     this.#anchor = parseAssetAnchor(cid); this.#cid = cid; this.#anchorDigestHex = toHex(this.#anchor.digest); this.#anchorText = cidToText(this.#anchor);
     this.#kind = this.#anchor.codec === DAG_CBOR_CODE ? 'bundle' : 'raw';
     this.#maxCacheBytes = maxCacheBytes ?? DEFAULT_MAX_CACHE_BYTES; this.#maxProofBytes = maxProofBytes ?? DEFAULT_MAX_PROOF_BYTES; this.#maxFileBytes = maxFileBytes ?? DEFAULT_MAX_FILE_BYTES;
@@ -62,7 +63,7 @@ export class VerifiedAsset {
     if (source !== undefined && (!bases.length || bases.some((base) => typeof base !== 'string' || !base.length))) throw new Error('source must be a base URL or a non-empty list of base URLs');
     if (this.#kind === 'raw' && proof !== undefined) throw new Error('proof is not valid for a raw anchor');
     const sources = bases.map((base) => base.replace(/\/+$/, ''));
-    const defaults = new DefaultRouter({ anchor: this.#anchorText, kind: this.#kind, sources, proof, hints, fetchFn: this.#fetch });
+    const defaults = new DefaultRouter({ anchor: this.#anchorText, kind: this.#kind, sources, proof, hints: hints(hintUrls), fetchFn: this.#fetch });
     this.#locator = new Locator(this.#router, defaults);
     this.#fileStore = new VerifiedStore({ sourceFor: (location, srcText) => this.#source(location, srcText) }, { maxCacheBytes: this.#maxCacheBytes, stats: this.#stats });
   }

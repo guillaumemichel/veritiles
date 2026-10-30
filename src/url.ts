@@ -34,3 +34,8 @@ export function containingDir(url: string): string {
 export function encodePath(path: string): string {
   return path.split('/').map(encodeURIComponent).join('/');
 }
+
+// The descriptor's location beside a proof base: `{base}/root` (SPEC §2.2).
+export function rootOf(base: string): string {
+  return `${base.replace(/\/+$/, '')}/root`;
+}

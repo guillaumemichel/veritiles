@@ -14,7 +14,6 @@ import { build } from 'esbuild';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-const HINTS = 'hints become a plugin';
 const SPLIT = 'raw files and bundles become two classes';
 const RANGED = [
   'src/descriptor.ts',
@@ -39,10 +38,10 @@ const USES: Use[] = [
   {
     name: 'raw file',
     entry: "export { VerifiedAsset } from './src/asset.ts';",
-    budget: 7_800,
+    budget: 7_950,
     without: RANGED,
     pending: {
-      'src/hints.ts': HINTS,
+      'src/hints.ts': SPLIT,
       'src/manifest.ts': SPLIT,
       'src/car.ts': SPLIT,
       'src/drisl.ts': SPLIT,
@@ -52,21 +51,21 @@ const USES: Use[] = [
   {
     name: 'MASL bundle',
     entry: "export { VerifiedAsset } from './src/asset.ts';",
-    budget: 7_800,
+    budget: 7_950,
     without: RANGED,
-    pending: { 'src/hints.ts': HINTS },
+    pending: { 'src/hints.ts': SPLIT },
   },
   {
     name: 'ranged file',
     entry: "export { VerifiedFile } from './src/verified-file.ts';",
-    budget: 9_300,
-    without: ['src/manifest.ts', 'src/car.ts', 'src/proof-source.ts'],
-    pending: { 'src/hints.ts': HINTS },
+    budget: 8_600,
+    without: ['src/hints.ts', 'src/manifest.ts', 'src/car.ts', 'src/proof-source.ts'],
+    pending: {},
   },
   {
     name: 'map',
     entry: "export { VerifiedSource, VerifiedAsset, assetProtocol } from './src/index.ts';",
-    budget: 11_900,
+    budget: 12_100,
     without: [],
     pending: {},
   },

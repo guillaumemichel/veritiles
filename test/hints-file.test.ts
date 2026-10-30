@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { VerifiedFile } from '../src/verified-file.ts';
+import { VerifiedFile } from '../src/hinted-file.ts';
 import { flipByte } from './helpers/bytes.ts';
 import { buildPkgFlat } from './helpers/pkg-fixtures.ts';
 import { scene, withPageUrl } from './helpers/serve-hints.ts';

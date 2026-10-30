@@ -1,5 +1,5 @@
-export { VerifiedFile } from './verified-file.ts';
-export type { VerifiedFileOptions } from './verified-file.ts';
+export { VerifiedFile } from './hinted-file.ts';
+export type { VerifiedFileOptions } from './hinted-file.ts';
 export type { FetchContext, Router, RouterOption, Verdict } from './router.ts';
 export { VerifiedSource } from './source.ts';
 export type { RangeResponse } from './source.ts';

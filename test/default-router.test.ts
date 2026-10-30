@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { DefaultRouter, type DefaultRouterOptions } from '../src/default-router.ts';
+import { hints } from '../src/hints.ts';
 import { withPageUrl } from './helpers/serve-hints.ts';
 
 const ANCHOR = 'bafyreiazjnja3qydqsz7yiz6ci3xra26flodmlmry3rtafpnhwzdphl6ue';
@@ -28,9 +29,13 @@ function docs(table: Record<string, Record<string, string[]>>) {
   return { fetchFn, requests };
 }
 
-function router(options: Partial<DefaultRouterOptions> & Pick<DefaultRouterOptions, 'kind'>, table: Record<string, Record<string, string[]>> = {}) {
+// The built-in router with hints on: `hints` names the documents, as the
+// plugin takes them.
+type RouterSpec = Partial<Omit<DefaultRouterOptions, 'hints'>> & Pick<DefaultRouterOptions, 'kind'> & { hints?: string | string[] };
+
+function router(options: RouterSpec, table: Record<string, Record<string, string[]>> = {}) {
   const { fetchFn, requests } = docs(table);
-  const defaults = new DefaultRouter({ anchor: ANCHOR, sources: [], proof: undefined, hints: undefined, fetchFn, ...options });
+  const defaults = new DefaultRouter({ anchor: ANCHOR, sources: [], proof: undefined, fetchFn, ...options, hints: hints(options.hints) });
   return { defaults, requests };
 }
 

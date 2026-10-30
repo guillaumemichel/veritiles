@@ -9,7 +9,7 @@ import { test } from 'node:test';
 
 import { PMTiles } from 'pmtiles';
 
-import { VerifiedFile } from '../src/verified-file.ts';
+import { VerifiedFile } from '../src/hinted-file.ts';
 import { VerifiedSource } from '../src/source.ts';
 import { packPmtiles } from '../tools/pack.ts';
 import { deterministicBytes, flipByte } from './helpers/bytes.ts';

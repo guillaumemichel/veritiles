@@ -254,9 +254,13 @@ it already holds (a configured anchor) or that a verified structure has named �
 gives per-resource whole-file sources once the manifest names it. A hints
 document pre-positions locations; it never chooses what is read.
 
-**Attachment.** A client option `hints` (string | string[]) references
+**Attachment.** Hints documents and discovery are a client option. Off, a
+client reads only its configured locations and its router's (§6) and fetches
+no document, so a page that names its locations carries none of this layer.
+veritiles turns them on by default; other readers take them as a plugin,
+`hints()`. On, a client option `hints` (string | string[]) references
 documents directly, defaulting to `./hints.json` beside the page (the same
-convention family as `{source}.proofs`). Every location option is therefore
+convention family as `{source}.proofs`). Every location option is then
 optional: the minimal deployment ships only anchors, with a `hints.json`
 beside them. These are the built-in router's rules (§6). An explicit document
 is consulted for every CID: fetched in the background once the client first
@@ -322,8 +326,8 @@ hostile document already holds — so nothing in this layer fails closed.
 
 A router finds where a CID's bytes may live at runtime — a content-routing
 index, a gateway, a lookup table. A client takes every location from one: the
-built-in router reads the page's own configuration (§4) and hints documents
-(§5); a custom router replaces it:
+built-in router reads the page's own configuration (§4) and, with hints on,
+hints documents (§5); a custom router replaces it:
 
 ```
 router.locate(cid, { defaults }) → URLs, best first, as an async iterable
@@ -333,8 +337,8 @@ router.fetch(url, init, context) → Promise<Response>      (optional)
 A function alone is shorthand for `{ locate }`. `locate` receives a CID in
 canonical text form (§1) and yields absolute URLs; an array, or a promise of
 one, is read as well. `defaults` yields what the built-in router would for the
-same CID — configured locations, then hinted, then probed — and is read only
-if the router reads it. A custom router is authoritative, and the order it
+same CID — configured locations, then, with hints on, hinted, then probed —
+and is read only if the router reads it. A custom router is authoritative, and the order it
 yields in is its strategy: the page's own locations first and its own after,
 its own first, or whichever come first. Like a hints document, a router is
 outside the root of trust: every byte fetched from a location it yields
