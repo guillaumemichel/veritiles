@@ -12,12 +12,14 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --conditions=anymirror-source --test 'test/!(pack-diff).test.ts' && node --conditions=anymirror-source packages/veritiles/examples/build-assets.ts",
+    "test": "node --conditions=anymirror-source --test 'test/!(pack-diff|packages).test.ts' && node --conditions=anymirror-source packages/veritiles/examples/build-assets.ts",
     "test:diff": "node --conditions=anymirror-source --test test/pack-diff.test.ts",
+    "test:packages": "node --test test/packages.test.ts",
     "pack": "node --conditions=anymirror-source tools/pack.ts",
     "pack:rs": "cargo run --release -q --manifest-path packer/Cargo.toml --",
     "typecheck": "tsc -p tsconfig.json",
-    "build": "npm run build -w @anymirror/router && npm run build -w anymirror && npm run build -w veritiles"
+    "build": "npm run build -w @anymirror/router && npm run build -w anymirror && npm run build -w veritiles",
+    "version:line": "node tools/version.ts"
   },
   "devDependencies": {
     "@ipld/car": "^5.4.6",

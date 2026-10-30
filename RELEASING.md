@@ -1,8 +1,10 @@
 # Releasing
 
-The repeatable runbook for cutting a `veritiles` release. Replace `X.Y.Z` with
-the target version throughout. Do the steps in order; the gate must be green
-before the version bump and again at publish (`prepublishOnly` re-runs it).
+The repeatable runbook for cutting a release of the packages: `anymirror`,
+`veritiles` and, when its contract changed, `@anymirror/router`. Replace
+`X.Y.Z` with the target version throughout. Do the steps in order; the gate
+must be green before the version bump, and the release workflow re-runs it
+before it publishes.
 
 ## Versioning
 
@@ -12,13 +14,25 @@ Pre-1.0 SemVer: **minor** (`0.3.x → 0.4.0`) for a new feature, **patch**
 or MASL manifest — or a removed/renamed public option. Widening an option
 (e.g. making a field optional) is not breaking.
 
+`anymirror` and `veritiles` share one version line and are released together:
+veritiles pins anymirror at its own version. `@anymirror/router` has a
+version of its own and moves only when the contract changes, so routers
+written for it keep working across releases; most releases leave it alone.
+
 ## What holds the version
 
-- `package.json` `"version"` is the source of truth; `package-lock.json` mirrors
-  it (two spots). `npm version` updates both.
-- There is **no** version constant in `src/` or `tools/` — don't grep for one.
-- `dist/` is **gitignored** and rebuilt by `prepublishOnly`; the release commit
-  never contains built files, and `npm publish` bundles a fresh `dist/`.
+- The version line lives in `packages/anymirror/package.json` and
+  `packages/veritiles/package.json`, plus veritiles' dependency on anymirror;
+  `npm run version:line -- X.Y.Z` sets all three, and `npm install` then
+  updates `package-lock.json`. The tag must name the line's version.
+- The contract's version is `packages/router/package.json`'s, with the range
+  anymirror depends on in `packages/anymirror/package.json`; both change by
+  hand, and only with the contract.
+- There is **no** version constant in any `src/` or `tools/` — don't grep for
+  one.
+- Every `dist/` is **gitignored** and rebuilt by its package's `prepack`; the
+  release commit never contains built files, and `npm publish` packs a fresh
+  `dist/`.
 - The examples and README load the browser bundle from a CDN by version — those
   pins are separate from `package.json` (see _CDN pins_ below).
 
@@ -28,12 +42,14 @@ From a clean tree on `main`:
 
 ```
 git status                 # only the intended release changes; nothing stray
-npm test && npm run typecheck && npm run build
+npm test && npm run typecheck && npm run build && npm run test:packages
 cargo build --release --manifest-path packer/Cargo.toml && npm run test:diff
 ```
 
+`npm run test:packages` installs the packed tarballs in an empty project and
+checks what each entry point exports and that their types resolve.
 `npm run test:diff` checks the Rust packer against `tools/pack.ts` byte for
-byte; `npm test` does not run it.
+byte; `npm test` runs neither.
 
 Do **not** stage the untracked working docs. `SPEC.md` is the only committed
 spec.
@@ -76,7 +92,7 @@ The browser bundle is loaded by a CDN `<script src>` in the README and each
 example. Find every pin:
 
 ```
-grep -rn "unpkg.com/veritiles@" README.md examples/
+grep -rn "unpkg.com/veritiles@" packages/veritiles/README.md packages/veritiles/examples/
 ```
 
 Use a **minor range**, `veritiles@MAJOR.MINOR` (e.g. `@0.4`), not an exact
@@ -99,53 +115,50 @@ trust-critical `<script>` include, prefer pin + SRI (`integrity=…`,
 
 ## 4. Bump, commit, tag
 
-Two equivalent ways — pick one.
-
-**A. `npm version` (bumps `package.json` + lock, commits, tags):**
-
 ```
-# stage the changelog + any pin edits first
-git add CHANGELOG.md README.md examples/
-git commit -m "docs: vX.Y.Z changelog and CDN pins"
-
-npm version <patch|minor> -m "chore: release v%s"   # bumps, commits, tags vX.Y.Z
-```
-
-**B. Manual (matches the shape of prior release commits):**
-
-```
-# edit package.json + package-lock.json version fields to X.Y.Z,
-# plus CHANGELOG.md and any pin edits
+npm run version:line -- X.Y.Z && npm install   # anymirror, veritiles and its pin
+# only if the contract changed: packages/router/package.json's version, and
+# anymirror's range for it in packages/anymirror/package.json
 git add -A            # confirm `git status` shows only release files
 git commit -m "chore: release vX.Y.Z"
 git tag -a vX.Y.Z -m "vX.Y.Z"          # tag body = the CHANGELOG entry
 ```
 
-Prior releases used a minimal `chore: release vX.Y.Z` commit touching only the
-version files; keeping the changelog/pin edits in a separate commit matches that
-shape.
+Prior releases kept the changelog and pin edits in a commit of their own,
+before a `chore: release vX.Y.Z` commit touching only the version files;
+either shape is fine.
 
 ## 5. Push — CI publishes
 
-Publishing is automated: `.github/workflows/release.yml` fires on the `vX.Y.Z`
-tag push, checks the tag against `package.json`, re-runs the gate via
-`prepublishOnly`, publishes to npm with trusted publishing (OIDC — no tokens,
-provenance attestations included), and creates a **draft** GitHub Release.
+Publishing is automated: `.github/workflows/release.yml` fires on the
+`vX.Y.Z` tag push, checks the tag against anymirror's version, re-runs the
+gate, then publishes every package whose version npm does not have yet, the
+contract first, with trusted publishing (OIDC — no tokens, provenance
+attestations included). A prerelease version goes out under the `next`
+dist-tag. It ends by creating a **draft** GitHub Release.
 
 ```
 git push origin main --follow-tags
 ```
 
 Do **not** run `npm publish` locally: a second publish of the same version
-fails, and a local publish carries no provenance. Local publish is the
-last-resort fallback when the workflow is unavailable — expect the workflow run
-for that tag to then fail red on the duplicate.
+fails, and a local publish carries no provenance. Two exceptions:
+
+- **A new package** must exist on npm before its trusted publisher can be
+  set. Publish its first version by hand, as a real prerelease
+  (`npm run build && npm publish -w <name> --tag next`), then on npmjs.com set
+  its trusted publisher to owner `anymirror-dev`, repository `anymirror`,
+  workflow `release.yml`.
+- **The last resort** when the workflow is unavailable; expect the workflow
+  run for that tag to then fail red on the duplicate.
 
 ## 6. Verify
 
 - The Release workflow run for `vX.Y.Z` is green
-- `npm view veritiles version` → `X.Y.Z`
-- `npm view veritiles dist-tags.latest` → `X.Y.Z`
+- `npm view anymirror version` and `npm view veritiles version` → `X.Y.Z`,
+  and so does `dist-tags.latest` for each
+- if the contract changed, `npm view @anymirror/router version` → its new
+  version
 - `https://unpkg.com/veritiles@X.Y.Z/dist/veritiles.js` resolves (unpkg may lag a
   minute), and the minor-range URL `…/veritiles@MAJOR.MINOR/…` redirects to it
 - CI drafted the GitHub Release with GitHub's generated notes. Replace its body
@@ -172,18 +185,21 @@ for that tag to then fail red on the duplicate.
   keeps the draft's tag; a raw API `PATCH` without `tag_name` detaches it.
   Review the draft on GitHub, then publish it.
 - Smoke-test an example against the new bundle if this release changed the client
-  API (e.g. `examples/hints.html` after the routing-hints release)
+  API (e.g. `packages/veritiles/examples/hints.html` after the routing-hints
+  release)
 
 ## Checklist
 
-- [ ] Gate green (`npm test && npm run typecheck && npm run build`)
+- [ ] Gate green (`npm test && npm run typecheck && npm run build && npm run test:packages`)
 - [ ] Packer diff green (`cargo build --release --manifest-path packer/Cargo.toml && npm run test:diff`)
 - [ ] `CHANGELOG.md` has the `[X.Y.Z]` entry
 - [ ] CDN pins are the current minor range (only changed on a minor bump)
-- [ ] `package.json` + `package-lock.json` at `X.Y.Z`
+- [ ] `npm run version:line -- X.Y.Z && npm install`: anymirror, veritiles
+      and veritiles' pin at `X.Y.Z`; the contract's version only if it changed
 - [ ] Working docs (`PLAN-*`, `SPEC-*`, `RELEASE-v*`) not committed
 - [ ] `chore: release vX.Y.Z` commit + `vX.Y.Z` tag
 - [ ] `git push origin main --follow-tags`
-- [ ] Release workflow green — CI published to npm (gate re-ran via `prepublishOnly`)
+- [ ] Release workflow green — CI published each new version to npm (the gate
+      re-ran first)
 - [ ] unpkg serves `@X.Y.Z`; draft GitHub Release body set to highlights, the
       collapsed changelog and the generated contributor notes, then published

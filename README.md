@@ -23,6 +23,8 @@ npm test               # unit, integration and golden tests, the bundle-size
                        # budgets, end to end through the real pmtiles reader
 npm run typecheck
 npm run build          # each package's dist/, and veritiles' script tag
+npm run test:packages  # after a build: the tarballs installed and imported
+                       # as an app sees them
 ```
 
 The tests read each package's sources directly, through the

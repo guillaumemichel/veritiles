@@ -1,8 +1,12 @@
-# Publish to npm on a version tag (v1.2.3). Publishing to npm is all a CDN
-# needs: unpkg and jsDelivr mirror the registry automatically.
+# Publish to npm on a version tag (v1.2.3): every package whose version npm
+# does not have yet. anymirror and veritiles share the version line, which the
+# tag names; @anymirror/router moves only when the contract changes, so most
+# releases leave it as it is. Publishing to npm is all a CDN needs: unpkg and
+# jsDelivr mirror the registry automatically.
 #
 # Auth is npm TRUSTED PUBLISHING (OIDC): no tokens, and provenance
-# attestations are generated automatically.
+# attestations are generated automatically. Each package names this workflow
+# as its trusted publisher on npmjs.com.
 name: Release
 
 on:
@@ -24,15 +28,31 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - run: npm install -g npm@latest # trusted publishing needs npm >= 11.5.1
       - run: npm ci
-      - name: Tag must match package.json version
+      - name: Tag must match the version line
         run: |
-          version="v$(node -p "require('./package.json').version")"
+          version="v$(node -p "require('./packages/anymirror/package.json').version")"
           if [ "$version" != "$GITHUB_REF_NAME" ]; then
-            echo "tag $GITHUB_REF_NAME does not match package.json $version" >&2
+            echo "tag $GITHUB_REF_NAME does not match anymirror's version $version" >&2
             exit 1
           fi
-      # prepublishOnly runs typecheck + tests + build.
-      - run: npm publish
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run test:packages
+      # The contract first: the packages after it depend on it. A prerelease
+      # goes out under `next`, never `latest`.
+      - name: Publish the versions npm lacks
+        run: |
+          for dir in router anymirror veritiles; do
+            name=$(node -p "require('./packages/$dir/package.json').name")
+            version=$(node -p "require('./packages/$dir/package.json').version")
+            if [ -n "$(npm view "$name@$version" version 2>/dev/null)" ]; then
+              echo "$name@$version is on npm already"
+              continue
+            fi
+            case "$version" in *-*) tag=next ;; *) tag=latest ;; esac
+            npm publish -w "packages/$dir" --tag "$tag"
+          done
       - name: Create draft GitHub Release
         run: gh release create "$GITHUB_REF_NAME" --generate-notes --draft
         env:
