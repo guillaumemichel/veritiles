@@ -1,13 +1,18 @@
-# veritiles — Verified Content over Dumb Hosts
+# anymirror — Verified Content over Dumb Hosts
 
-veritiles verifies content fetched from untrusted static hosts. The only trust
+anymirror verifies content fetched from untrusted static hosts. The only trust
 input is a CID anchor. A host may withhold bytes, but cannot alter a byte that
 passes verification.
 
-| client          | content shape                     | reads       | authenticated format                         |
-| --------------- | --------------------------------- | ----------- | -------------------------------------------- |
-| `VerifiedFile`  | one large file, such as PMTiles   | byte ranges | DRISL descriptor plus meta/shard proof tree  |
-| `VerifiedAsset` | one file or path-addressed bundle | whole files | raw CID or strict MASL bundle in a CARv1 bag |
+| client           | content shape                   | reads       | authenticated format                        |
+| ---------------- | ------------------------------- | ----------- | ------------------------------------------- |
+| `VerifiedFile`   | one large file, such as PMTiles | byte ranges | DRISL descriptor plus meta/shard proof tree |
+| `VerifiedRaw`    | one small file                  | whole file  | raw CID                                     |
+| `VerifiedBundle` | path-addressed bundle           | whole files | strict MASL bundle in a CARv1 bag           |
+
+The clients are the `anymirror` package's readers. veritiles, its map
+package, adds `VerifiedAsset`, which takes either asset anchor and reads it
+with `VerifiedRaw` or `VerifiedBundle`, as the anchor's codec says.
 
 Hosts need only GET. Publishing is `cp`; mirroring is `rsync`.
 
@@ -21,15 +26,15 @@ The one exception is a descriptor's `map` (§2.1): a BDASL CID, codec `raw`,
 BLAKE3 (0x1e), 32-byte digest. It names a file and is never recomputed by a
 client, so every hash a client checks is sha2-256.
 
-| anchor codec | names                           | accepted by     |
-| ------------ | ------------------------------- | --------------- |
-| `dag-cbor`   | a ranges descriptor             | `VerifiedFile`  |
-| `dag-cbor`   | a MASL asset manifest           | `VerifiedAsset` |
-| `raw`        | one whole file, at most 256 KiB | `VerifiedAsset` |
+| anchor codec | names                           | accepted by      |
+| ------------ | ------------------------------- | ---------------- |
+| `dag-cbor`   | a ranges descriptor             | `VerifiedFile`   |
+| `dag-cbor`   | a MASL asset manifest           | `VerifiedBundle` |
+| `raw`        | one whole file, at most 256 KiB | `VerifiedRaw`    |
 
 The client class is configuration, not content sniffing. A dag-cbor block is
 decoded only as the template required by that class: a descriptor supplied to
-`VerifiedAsset`, or a manifest supplied to `VerifiedFile`, rejects.
+`VerifiedBundle`, or a manifest supplied to `VerifiedFile`, rejects.
 
 ## 2. Ranged files
 
@@ -120,9 +125,10 @@ discarded.
 
 ### 3.1 Raw assets
 
-A raw anchor represents exactly one file. `bytes("")` GETs the configured URL
-whole (at most 256 KiB) and sha-256 checks it against the anchor digest; any
-sub-path rejects. Raw assets have no proof URL.
+A raw anchor represents exactly one file. `VerifiedRaw` GETs the configured
+URL whole (at most 256 KiB) and sha-256 checks it against the anchor digest.
+A raw asset has no sub-paths, so `VerifiedAsset` rejects any, and no proof
+URL.
 
 ### 3.2 MASL bundles
 

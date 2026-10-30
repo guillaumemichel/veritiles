@@ -6,15 +6,48 @@ fix).
 
 ## [Unreleased]
 
+### Added
+
+- **anymirror**: the readers on their own, without the map adapters, each
+  behind its own entry point: `anymirror/file` (`VerifiedFile`, one large
+  file by byte ranges), `anymirror/raw` (`VerifiedRaw`, one small file),
+  `anymirror/bundle` (`VerifiedBundle`, a MASL bundle) and `anymirror/hints`
+  (`hints()`). A page carries only the reader it uses: gzipped, a raw file
+  costs 4.4 KB, a bundle 6.8 KB and a ranged file 8.5 KB, where every page
+  carried 8.4 to 9.2 KB before. `assetKind(cid)` says which reader an asset
+  anchor needs.
+- **@anymirror/router**: the router contract (`Router`, `FetchContext`,
+  `Verdict`, `RouterOption`), types alone. It changes only with the contract,
+  so a router depends on nothing else and keeps working across releases.
+
+### Changed
+
+- **Hints as a plugin** ([`SPEC.md` §5](https://github.com/anymirror-dev/anymirror/blob/v0.7.0/SPEC.md#5-routing-hints)):
+  hints documents and discovery are a client option, off in anymirror's
+  readers unless a page passes `hints()`. veritiles keeps them on by default.
+- veritiles is built on anymirror and pins it at the same version. Its API
+  and behavior are unchanged; the map bundle grows by 0.5 KB gzipped (11.7 to
+  12.2 KB) for the seams between the readers.
+- The repository is now `anymirror-dev/anymirror`, and the spec is the
+  anymirror spec. The packer is `anymirror-pack`, installed with
+  `cargo install --path packer`; the TypeScript packer stays in the
+  repository, for the tests.
+
 ### Fixed
 
-- The MapLibre examples (`examples/maplibre.html`, `hints.html`,
-  `assets.html`) and the README's MapLibre snippet import MapLibre GL's ES
-  module. MapLibre 6 ships no `maplibre-gl.js`, so they stopped at a 404
-  before drawing a tile. They now pin MapLibre GL 6.16.0 and PMTiles 4.5.0.
+- The MapLibre examples (`packages/veritiles/examples/maplibre.html`,
+  `hints.html`, `assets.html`) and the README's MapLibre snippet import
+  MapLibre GL's ES module. MapLibre 6 ships no `maplibre-gl.js`, so they
+  stopped at a 404 before drawing a tile. They now pin MapLibre GL 6.16.0 and
+  PMTiles 4.5.0.
 - The OpenLayers example pins OpenLayers 9.2.4: ol-pmtiles 2.0.2's browser
   bundle throws on the first tile with OpenLayers 10, so the example drew
   nothing.
+
+### Notes
+
+- No format changes: anchors, proofs and bundles packed for 0.6 read as
+  before.
 
 ## [0.6.1] — Verified sprites
 

@@ -12,14 +12,21 @@ compromised host can withhold bytes (visible), but cannot alter one undetected:
 tampered bytes fail verification, are counted, and are never rendered. With
 more than one source configured, a bad host is skipped for the next.
 
+veritiles is the map package of [anymirror](https://github.com/anymirror-dev/anymirror/tree/main/packages/anymirror): its readers
+are anymirror's, with hints documents on by default, plus a PMTiles `Source`
+and a MapLibre protocol for verified assets. A page that reads a file or an
+asset without a map carries less with anymirror alone.
+
 The integrity proof is a small directory of static files: a tiny **descriptor**
 (the anchor's block) plus a tree of digest files. The client downloads only the
 pieces covering what it reads — a tile fetch costs at most a couple of small
 proof files, even for a planet-size archive — and verifies every byte against
-the sha2-256 chain rooted in the anchor (see [`SPEC.md`](./SPEC.md)).
+the sha2-256 chain rooted in the anchor (see [`SPEC.md`](https://github.com/anymirror-dev/anymirror/blob/main/SPEC.md)).
 
-- **Zero dependencies** — ~30 KB minified, including CID, DRISL/CBOR, and
-  CAR handling. WebCrypto is the only cryptography.
+- **No third-party dependencies** — anymirror is its only one. The
+  script-tag bundle holds everything in ~37 KB minified (12.5 KB gzipped),
+  including CID, DRISL/CBOR, and CAR handling. WebCrypto is the only
+  cryptography.
 - **Zero per-tile overhead** — a warm tile read is one exact `Range`
   request, the same bytes an unverified client would fetch.
 - **One round trip for cold tiles** — tile data is fetched speculatively
@@ -67,7 +74,7 @@ or from a CDN as a script tag (exposes the `veritiles` global):
   // MapLibre GL 6 ships ES modules only.
   import * as maplibregl from "https://unpkg.com/maplibre-gl@6.16.0/dist/maplibre-gl.mjs";
 
-  const cid = "bafyrei…"; // the proof descriptor's CID — printed by `npm run pack`
+  const cid = "bafyrei…"; // the proof descriptor's CID — printed by `anymirror-pack`
   const source = new veritiles.VerifiedSource({
     cid,
     source: "https://tiles.example/world.pmtiles",
@@ -289,7 +296,7 @@ mechanism. Use `--unixfs` while packing to embed a reproducible UnixFS root
 CID (the standard 256 KiB fixed-chunk `ipfs add --cid-version 1` layout).
 Then pin the emitted `--full-car` output, or import it with `ipfs dag import`;
 a gateway holding that DAG is a valid configured _content_ source. The client
-continues to verify gateway range responses against the veritiles proof tree.
+continues to verify gateway range responses against the anymirror proof tree.
 
 ## Verified assets
 
@@ -357,28 +364,26 @@ HTTPS and `Access-Control-Allow-Origin: *` — reads are whole-file `GET`s, so
 
 ## Creating verified content
 
-The packer is a repository development tool, not part of the published
-`veritiles` npm package. Clone this repository and install its development
-dependencies before running it:
+Publishers pack with `anymirror-pack`, a Rust command line tool, which needs
+Rust and a C compiler:
 
 ```sh
 git clone https://github.com/anymirror-dev/anymirror.git
-cd anymirror
-npm ci
+cargo install --path anymirror/packer   # installs anymirror-pack
 ```
 
 ```sh
-npm run pack -- map.pmtiles
+anymirror-pack map.pmtiles
 # → writes map.pmtiles.proofs/  (descriptor + proof tree)
 # → prints the anchor CID (bafyrei…) to stdout
 
 # Optional IPFS bridge for the same archive:
-npm run pack -- map.pmtiles --unixfs --full-car map.car
+anymirror-pack map.pmtiles --unixfs --full-car map.car
 # → prints a descriptor anchor and its UnixFS CID
 # → writes map.car for `ipfs dag import` / pinning
 
 # A verified path-addressed asset bundle:
-npm run pack -- assets ./public --out assets.car
+anymirror-pack assets ./public --out assets.car
 # → a directory totalling ≤ 256 KiB travels whole in the CAR (one fetch
 #   serves the bundle); anything larger emits the manifest alone — the
 #   proof — and clients fetch content from `{base}/{path}`
@@ -386,8 +391,8 @@ npm run pack -- assets ./public --out assets.car
 #   names for the anchor
 
 # Check a package before uploading it:
-npm run pack -- verify --cid bafyrei… --file map.pmtiles --proofs map.pmtiles.proofs
-# → prints `verify OK`
+anymirror-pack verify --cid bafyrei… --file map.pmtiles --proofs map.pmtiles.proofs
+# → prints `verify OK`, having hashed every byte
 ```
 
 Upload `map.pmtiles` and `map.pmtiles.proofs/` to any static host and
@@ -396,48 +401,20 @@ boundaries at the ranges a pmtiles reader actually requests — each leaf is
 one tile, or a run of small neighbouring tiles of at most 16, 32 or 64 KiB
 (`--tile-group`; by default the smallest that lets the descriptor list every
 proof shard, so a first view needs no extra round trip) — and shapes the
-proof tree by zoom level. A fragmented MP4 — video or audio, as Media Source
-Extensions players and DASH stream it — gets one leaf per fragment (`moof`
-plus `mdat`) after one for the init section, so a player that reads each
-fragment at the range its `sidx` lists downloads exactly that fragment.
-Other files pack with fixed-size leaves (`--chunk`, default 1 MiB). The reference application
-(PMTiles archive → verified map) lives in the
+proof tree by zoom level. It reads local files only, of any size with
+bounded memory: download a remote archive with `curl -o` first. The
+reference application (PMTiles archive → verified map) lives in the
 [ipfs-pmtiles-demo](https://github.com/guillaumemichel/ipfs-pmtiles-demo)
 repository, alongside a
 [live demo](https://guillaumemichel.github.io/ipfs-pmtiles-demo/) of this
 verification client (try `?tamper=1`).
 
-The TS packer reads its whole input into memory, which caps it near 2 GiB.
-For larger files — a planet-scale PMTiles — use the Rust packer in
-[`packer/`](./packer/README.md). It takes the same arguments and writes the
-same bytes, but reads local files only (download with `curl -o` first) and
-needs Rust and a C compiler:
-
-```sh
-npm run pack:rs -- planet.pmtiles
-npm run pack:rs -- planet.pmtiles --unixfs --full-car planet.car
-npm run pack:rs -- assets ./public --out assets.car
-npm run pack:rs -- verify --cid bafyrei… --file planet.pmtiles --proofs planet.pmtiles.proofs
-```
-
-Its `verify` hashes every byte; the TS `verify` spot-reads 64 random ranges
-through a real client.
-
 ## Development
 
-```sh
-npm ci
-npm test           # unit + differential tests, kubo-verified golden anchors,
-                   # end-to-end through the real pmtiles reader
-npm run typecheck
-npm run build      # dist/: ESM bundle, minified IIFE (~30 KB), .d.ts
-```
-
-The library is zero-dependency by design. Canonical IPLD implementations
-(`multiformats`, `@ipld/dag-cbor`, `@ipld/dag-pb`, `@ipld/car`,
-`ipfs-unixfs-importer`, `blockstore-core`) and `pmtiles` are dev-dependencies
-only. They cross-check CID, DRISL/MASL, CAR, and optional UnixFS publishing
-output in the test suite.
+veritiles is developed in the
+[anymirror repository](https://github.com/anymirror-dev/anymirror), beside the
+readers it is built on; the repository's README covers the tests and the
+build.
 
 ## License
 
