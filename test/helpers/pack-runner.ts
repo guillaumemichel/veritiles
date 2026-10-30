@@ -10,8 +10,12 @@ import { dirname, join } from 'node:path';
 
 import type { PackCase } from './pack-corpus.ts';
 
+export const PACK_TIMEOUT_MS = 120_000;
+
 export interface PackRun {
   status: number | null;
+  /** The signal that ended the run: `SIGTERM` once it outlived PACK_TIMEOUT_MS. */
+  signal: NodeJS.Signals | null;
   stdout: string;
   stderr: string;
   files: Map<string, Uint8Array>;
@@ -32,6 +36,7 @@ export async function runPacker(command: string[], packCase: PackCase): Promise<
     }
     return {
       status: result.status,
+      signal: result.signal,
       stdout: result.stdout.toString('utf8'),
       stderr: result.stderr.toString('utf8').replaceAll(dir, '<dir>'),
       files,
@@ -41,17 +46,17 @@ export async function runPacker(command: string[], packCase: PackCase): Promise<
   }
 }
 
-interface Exit { status: number | null; stdout: Buffer; stderr: Buffer }
+interface Exit { status: number | null; signal: NodeJS.Signals | null; stdout: Buffer; stderr: Buffer }
 
 function run(command: string[], args: string[], cwd: string): Promise<Exit> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command[0]!, [...command.slice(1), ...args], { cwd, timeout: 120_000, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command[0]!, [...command.slice(1), ...args], { cwd, timeout: PACK_TIMEOUT_MS, stdio: ['ignore', 'pipe', 'pipe'] });
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
     child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
     child.on('error', reject);
-    child.on('close', (status) => resolve({ status, stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr) }));
+    child.on('close', (status, signal) => resolve({ status, signal, stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr) }));
   });
 }
 

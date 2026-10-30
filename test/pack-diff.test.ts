@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import type { PackCase } from './helpers/pack-corpus.ts';
 import { packCorpus } from './helpers/pack-corpus.ts';
 import { verifyCorpus } from './helpers/pack-corpus-verify.ts';
-import { runPacker } from './helpers/pack-runner.ts';
+import { PACK_TIMEOUT_MS, type PackRun, runPacker } from './helpers/pack-runner.ts';
 
 const rustBin = fileURLToPath(new URL('../packer/target/release/anymirror-pack', import.meta.url));
 const tsPack = [process.execPath, fileURLToPath(new URL('../tools/pack.ts', import.meta.url))];
@@ -27,6 +27,8 @@ const concurrency = Math.max(1, Math.floor(availableParallelism() / 2));
 
 async function compare(packCase: PackCase): Promise<void> {
   const [ts, rs] = await Promise.all([runPacker(tsPack, packCase), runPacker([rustBin], packCase)]);
+  assertExited('TS', ts);
+  assertExited('Rust', rs);
   assert.equal(rs.status, ts.status, `exit status (ts stderr: ${ts.stderr}, rust stderr: ${rs.stderr})`);
   assert.equal(ts.status === 0, !packCase.name.endsWith('(error)'), `TS exit status ${ts.status} contradicts the case name`);
   assert.equal(rs.stdout, ts.stdout, 'stdout');
@@ -35,6 +37,13 @@ async function compare(packCase: PackCase): Promise<void> {
   for (const [path, bytes] of ts.files) {
     assert.ok(Buffer.compare(rs.files.get(path)!, bytes) === 0, `${path} differs`);
   }
+}
+
+// A packer killed by a signal never answered: say so, rather than compare
+// its missing exit status.
+function assertExited(name: string, run: PackRun): void {
+  const why = run.signal === 'SIGTERM' ? `still running after ${PACK_TIMEOUT_MS / 1000} s` : `killed by ${run.signal}`;
+  assert.equal(run.signal, null, `the ${name} packer was ${why}; its stderr so far: ${JSON.stringify(run.stderr)}`);
 }
 
 describe('pack diff', { concurrency }, () => {
