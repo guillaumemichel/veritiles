@@ -1,9 +1,6 @@
 // Bundle budgets: what a page pays for each use, its entry bundled as an
 // app's bundler would (esbuild, ESM, minified), then gzipped. Each use also
-// names modules it must not carry, code its page never runs: `without` holds
-// today, `pending` waits for a cut not made yet and runs as a todo until
-// then. A cut moves its modules from `pending` to `without` and lowers the
-// budgets it shrinks.
+// names modules it must not carry, code its page never runs.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -14,7 +11,6 @@ import { build } from 'esbuild';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-const SPLIT = 'raw files and bundles become two classes';
 const RANGED = [
   'src/descriptor.ts',
   'src/proof-format.ts',
@@ -31,43 +27,32 @@ interface Use {
   /** Gzipped bytes: the size when last cut, plus a little headroom. */
   budget: number;
   without: string[];
-  pending: Record<string, string>;
 }
 
 const USES: Use[] = [
   {
     name: 'raw file',
-    entry: "export { VerifiedAsset } from './src/asset.ts';",
-    budget: 7_950,
-    without: RANGED,
-    pending: {
-      'src/hints.ts': SPLIT,
-      'src/manifest.ts': SPLIT,
-      'src/car.ts': SPLIT,
-      'src/drisl.ts': SPLIT,
-      'src/proof-source.ts': SPLIT,
-    },
+    entry: "export { VerifiedRaw } from './src/raw.ts';",
+    budget: 4_450,
+    without: [...RANGED, 'src/hints.ts', 'src/manifest.ts', 'src/car.ts', 'src/drisl.ts', 'src/proof-source.ts'],
   },
   {
     name: 'MASL bundle',
-    entry: "export { VerifiedAsset } from './src/asset.ts';",
-    budget: 7_950,
-    without: RANGED,
-    pending: { 'src/hints.ts': SPLIT },
+    entry: "export { VerifiedBundle } from './src/bundle.ts';",
+    budget: 6_900,
+    without: [...RANGED, 'src/hints.ts'],
   },
   {
     name: 'ranged file',
     entry: "export { VerifiedFile } from './src/verified-file.ts';",
     budget: 8_600,
     without: ['src/hints.ts', 'src/manifest.ts', 'src/car.ts', 'src/proof-source.ts'],
-    pending: {},
   },
   {
     name: 'map',
     entry: "export { VerifiedSource, VerifiedAsset, assetProtocol } from './src/index.ts';",
-    budget: 12_100,
+    budget: 12_400,
     without: [],
-    pending: {},
   },
 ];
 
@@ -107,18 +92,14 @@ async function bundleOnce(entry: string): Promise<Bundle> {
   return { minified: code.length, gzipped: gzipSync(code, { level: 9 }).length, modules };
 }
 
-for (const { name, entry, budget, without, pending } of USES) {
+for (const { name, entry, budget, without } of USES) {
   test(`${name}: at most ${budget} bytes gzipped`, async () => {
     const { minified, gzipped } = await bundle(entry);
     assert.ok(gzipped <= budget, `${name}: ${gzipped} bytes gzipped (${minified} minified), over its budget of ${budget}`);
   });
 
-  const checks: [string, string | undefined][] = [
-    ...without.map((module): [string, undefined] => [module, undefined]),
-    ...Object.entries(pending),
-  ];
-  for (const [module, todo] of checks) {
-    test(`${name}: carries no ${module}`, { todo }, async () => {
+  for (const module of without) {
+    test(`${name}: carries no ${module}`, async () => {
       const { modules } = await bundle(entry);
       assert.ok(!modules.includes(module), `${name} carries ${module}`);
     });

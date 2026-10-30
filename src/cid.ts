@@ -27,14 +27,7 @@ export interface Cid {
 // 32-byte digest, codec dag-cbor — the proof descriptor block. Anything else
 // rejects; clients MUST NOT sniff bodies to decide.
 export function parseFileAnchor(text: unknown): Cid {
-  const cid = parseCid(text, 'anchor');
-  if (cid.hashCode !== SHA2_256_CODE || cid.digest.length !== 32) {
-    throw new VerificationError('anchor: CID must be sha2-256 with a 32-byte digest');
-  }
-  if (cid.codec !== DAG_CBOR_CODE) {
-    throw new VerificationError('anchor: CID codec must be dag-cbor (a proof descriptor)');
-  }
-  return cid;
+  return parseAnchor(text, [DAG_CBOR_CODE], 'dag-cbor (a proof descriptor)');
 }
 
 // The assets-path anchor gate (SPEC §1): a CIDv1, base32, sha2-256, 32-byte
@@ -42,12 +35,25 @@ export function parseFileAnchor(text: unknown): Cid {
 // dag-cbor (a MASL manifest). Anything else rejects; clients MUST NOT sniff
 // bodies to decide.
 export function parseAssetAnchor(text: unknown): Cid {
+  return parseAnchor(text, [RAW_CODE, DAG_CBOR_CODE], 'raw or dag-cbor');
+}
+
+// The same gate for one kind of asset: a raw file, or a MASL bundle.
+export function parseRawAnchor(text: unknown): Cid {
+  return parseAnchor(text, [RAW_CODE], 'raw (one file)');
+}
+
+export function parseBundleAnchor(text: unknown): Cid {
+  return parseAnchor(text, [DAG_CBOR_CODE], 'dag-cbor (a MASL manifest)');
+}
+
+function parseAnchor(text: unknown, codecs: number[], expected: string): Cid {
   const cid = parseCid(text, 'anchor');
   if (cid.hashCode !== SHA2_256_CODE || cid.digest.length !== 32) {
     throw new VerificationError('anchor: CID must be sha2-256 with a 32-byte digest');
   }
-  if (cid.codec !== RAW_CODE && cid.codec !== DAG_CBOR_CODE) {
-    throw new VerificationError('anchor: CID codec must be raw or dag-cbor');
+  if (!codecs.includes(cid.codec)) {
+    throw new VerificationError(`anchor: CID codec must be ${expected}`);
   }
   return cid;
 }

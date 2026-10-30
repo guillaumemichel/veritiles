@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { NotFoundError, VerifiedAsset } from '../src/asset.ts';
+import { VerifiedAsset } from '../src/asset.ts';
+import { NotFoundError } from '../src/bundle.ts';
 import { VerificationError } from '../src/verify.ts';
 import { buildArtifact, serveArtifact } from './helpers/artifact.ts';
 import { deterministicBytes, flipByte } from './helpers/bytes.ts';
