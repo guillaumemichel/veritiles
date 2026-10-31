@@ -1,6 +1,6 @@
 {
   "name": "@anymirror/fisl-router",
-  "version": "0.7.0-alpha.0",
+  "version": "0.7.0",
   "description": "A router over a FISL index for anymirror readers and veritiles: looks a CID up and yields the URLs it names beside the page's own locations.",
   "type": "module",
   "license": "MIT",
@@ -45,7 +45,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@anymirror/router": "^0.7.0-alpha.0"
+    "@anymirror/router": "^0.7.0"
   },
   "publishConfig": {
     "access": "public"

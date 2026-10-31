@@ -1,6 +1,6 @@
 {
   "name": "veritiles",
-  "version": "0.7.0-alpha.0",
+  "version": "0.7.0",
   "description": "Verified map tiles: a pmtiles-compatible Source that fetches PMTiles byte ranges from any dumb HTTP host and cryptographically verifies every byte against a content-addressed trust anchor (CID) before your map renders it.",
   "type": "module",
   "license": "MIT",
@@ -53,6 +53,6 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@anymirror/core": "0.7.0-alpha.0"
+    "@anymirror/core": "0.7.0"
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@anymirror/core",
-  "version": "0.7.0-alpha.0",
+  "version": "0.7.0",
   "description": "Verified content from any mirror: fetches files, byte ranges and bundles from untrusted HTTP hosts and verifies every byte against a CID before handing it over.",
   "type": "module",
   "license": "MIT",
@@ -68,7 +68,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@anymirror/router": "^0.7.0-alpha.0"
+    "@anymirror/router": "^0.7.0"
   },
   "publishConfig": {
     "access": "public"

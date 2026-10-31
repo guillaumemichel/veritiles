@@ -6,6 +6,8 @@ fix).
 
 ## [Unreleased]
 
+## [0.7.0] — anymirror
+
 ### Added
 
 - **@anymirror/core**: the readers on their own, without the map adapters,
@@ -435,6 +437,7 @@ anchor.
   with failover across mirrors, tamper bans, and verified-byte caching.
   Examples for MapLibre GL, Leaflet, and OpenLayers.
 
+[0.7.0]: https://github.com/anymirror-dev/anymirror/releases/tag/v0.7.0
 [0.6.1]: https://github.com/anymirror-dev/anymirror/releases/tag/v0.6.1
 [0.6.0]: https://github.com/anymirror-dev/anymirror/releases/tag/v0.6.0
 [0.5.0]: https://github.com/anymirror-dev/anymirror/releases/tag/v0.5.0

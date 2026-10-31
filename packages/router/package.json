@@ -1,6 +1,6 @@
 {
   "name": "@anymirror/router",
-  "version": "0.7.0-alpha.0",
+  "version": "0.7.0",
   "description": "The router contract for anymirror readers: where a CID's bytes may live, and what the reader made of each answer. Types only.",
   "type": "module",
   "license": "MIT",
